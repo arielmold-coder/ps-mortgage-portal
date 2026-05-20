@@ -1,16 +1,14 @@
-const express = require('express');
+const http = require('http');
+const fs = require('fs');
 const path = require('path');
-const app = express();
+
 const PORT = process.env.PORT || 3000;
+const htmlPath = path.join(__dirname, 'public', 'index.html');
+const HTML = fs.readFileSync(htmlPath);
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/health', (req, res) => res.send('OK'));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Mortgage Portal running on port ${PORT}`);
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(HTML);
+}).listen(PORT, '0.0.0.0', () => {
+  console.log('PS Mortgage Portal running on port ' + PORT);
 });
