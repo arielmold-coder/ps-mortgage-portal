@@ -81,8 +81,8 @@
   <div style="text-align:center">
     <div class="boi-badge">
       <div class="lbl">ריבית בנק ישראל</div>
-      <div class="val" id="boi-rate-val">4.50%</div>
-      <div class="lbl">פריים: <span id="prime-val">6.00%</span></div>
+      <div class="val" id="boi-rate-val">4.00%</div>
+      <div class="lbl">פריים: <span id="prime-val">5.50%</span></div>
     </div>
     <button class="refresh-btn" onclick="refreshBOI()">🔄 רענן ריבית BOI</button>
     <div id="refresh-status">נתוני ניירות: 19.05.2026</div>
@@ -115,8 +115,8 @@
 <!-- DASHBOARD -->
 <div id="tab-dashboard" class="tab-pane active">
   <div class="kpi-row">
-    <div class="kpi"><div class="lbl">ריבית בנק ישראל</div><div class="val" id="k-boi">4.50%</div><div class="sub">ללא שינוי</div></div>
-    <div class="kpi gold"><div class="lbl">ריבית פריים</div><div class="val" id="k-prime">6.00%</div><div class="sub">BOI + 1.5%</div></div>
+    <div class="kpi"><div class="lbl">ריבית בנק ישראל</div><div class="val" id="k-boi">4.00%</div><div class="sub">ללא שינוי</div></div>
+    <div class="kpi gold"><div class="lbl">ריבית פריים</div><div class="val" id="k-prime">5.50%</div><div class="sub">BOI + 1.5%</div></div>
     <div class="kpi"><div class="lbl">משכנתא שקלית ממוצע</div><div class="val">6.69%</div><div class="sub">BOI BIR_MRTG פבר׳ 2026</div></div>
     <div class="kpi gold"><div class="lbl">משכנתא צמודה ממוצע</div><div class="val">3.26%</div><div class="sub">+ ציפיות אינפלציה</div></div>
     <div class="kpi"><div class="lbl">CPI שנתי</div><div class="val">0.78%</div><div class="sub">מרץ 2026</div></div>
@@ -229,7 +229,7 @@
     <h3>פרשנות מדיניות</h3>
     <p style="font-size:.84rem;line-height:1.75;color:#444">
       עקום מקמ שטוח ב-<b>3.65%–3.99%</b> לכל הטווחים עד שנה. ריביות הקדימה נעות סביב <b>3.6%–3.9%</b>,
-      מה שמגלם ציפייה להפחתת ריבית אחת (מ-4.5% לכ-3.75%) בשנה הקרובה.
+      מה שמגלם ציפייה להפחתת ריבית אחת (מ-4.0% לכ-3.50%) בשנה הקרובה.
       שחר 10Y ב-4.14% = מרווח <b>+64bp מעל BOI</b> – פרמיית טווח גבוהה.
     </p>
   </div>
@@ -247,7 +247,7 @@
           <option value="4.73">שקלי קבוע עד 5Y – 4.73%</option>
           <option value="4.74">שקלי קבוע 5–15Y – 4.74%</option>
           <option value="5.64">פריים משתנה – 5.64%</option>
-          <option value="6.00">פריים – 6.00%</option>
+          <option value="5.50">פריים – 5.50%</option>
           <option value="3.25">צמוד קבוע – 3.25%+מדד</option>
           <option value="3.45">צמוד משתנה – 3.45%+מדד</option>
           <option value="">הזנה ידנית</option>
@@ -289,7 +289,7 @@
       <div class="ch"><canvas id="ch-bank-trend"></canvas></div>
     </div>
     <div class="card">
-      <h3>פרמיה מעל ריבית BOI (4.5%)</h3>
+      <h3>פרמיה מעל ריבית BOI (4.0%)</h3>
       <table>
         <tr><th>מסלול</th><th>ריבית</th><th>פרמיה</th></tr>
         <tr><td>שקלי קבוע עד 5Y</td><td>4.73%</td><td><b>+0.23%</b></td></tr>
@@ -394,7 +394,7 @@
     <div class="card">
       <h3>המלצות אסטרטגיות – מצב שוק נוכחי</h3>
       <div style="font-size:.84rem;line-height:1.85;color:#444">
-        <p><b>🎯 BOI 4.5%</b> – צפי להפחתה אחת בשנה הקרובה לפי מקמ</p>
+        <p><b>🎯 BOI 4.0%</b> – צפי להפחתה אחת בשנה הקרובה לפי מקמ</p>
         <p><b>📈 עקום שטוח–חיובי</b> – מרווח 10Y–2Y: 43bp</p>
         <p><b>💡 CPI 0.78%</b> – מתחת ליעד. BE שוק: ~2%</p>
         <p><b>🏘️ דיור</b> – ירידה ארצית 1.2%, ירושלים חזקה</p>
@@ -557,7 +557,7 @@ function initDash() {
     labels:D.forwards.map(f=>f.d),
     datasets:[
       {label:'ריבית קדימה %',data:D.forwards.map(f=>f.f),backgroundColor:D.forwards.map(f=>f.f<4.25?'rgba(39,174,96,.75)':f.f<4.5?'rgba(184,151,77,.75)':'rgba(107,26,40,.75)'),borderRadius:4},
-      {label:'BOI 4.5%',type:'line',data:D.forwards.map(()=>4.5),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
+      {label:'BOI 4.0%',type:'line',data:D.forwards.map(()=>4.0),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
     ]},
     options:baseOpts({scales:{x:{ticks:{font:{size:9}},grid:{display:false}},y:{min:3.0,max:4.8,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
   });
@@ -596,7 +596,7 @@ function initMakam() {
     labels:D.makam.map(m=>m.nm.replace('מקמ ','')),
     datasets:[
       {label:'תשואת מקמ %',data:D.makam.map(m=>m.y),borderColor:M,backgroundColor:'rgba(107,26,40,.07)',fill:true,borderWidth:2.5,pointRadius:5,tension:.3},
-      {label:'BOI 4.5%',data:D.makam.map(()=>4.5),borderColor:RD,borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false}
+      {label:'BOI 4.0%',data:D.makam.map(()=>4.0),borderColor:RD,borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false}
     ]},
     options:baseOpts({scales:{x:{ticks:{font:{size:9}},grid:{display:false}},y:{min:3.4,max:4.8,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
   });
@@ -605,7 +605,7 @@ function initMakam() {
     labels:D.forwards.map(f=>f.d),
     datasets:[
       {label:'Forward %',data:D.forwards.map(f=>f.f),backgroundColor:D.forwards.map(f=>f.f<4.25?'rgba(39,174,96,.8)':f.f<4.5?'rgba(184,151,77,.8)':'rgba(107,26,40,.8)'),borderRadius:4},
-      {label:'BOI 4.5%',type:'line',data:D.forwards.map(()=>4.5),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
+      {label:'BOI 4.0%',type:'line',data:D.forwards.map(()=>4.0),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
     ]},
     options:baseOpts({scales:{x:{ticks:{font:{size:9},maxRotation:30},grid:{display:false}},y:{min:3.0,max:5.0,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
   });
@@ -752,7 +752,7 @@ function calcMortgage() {
 async function refreshBOI() {
   document.getElementById('refresh-status').textContent='מרענן...';
   try {
-    const r=await fetch('https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/BR/1.0/MNT_RIB_BOI_D?lastNObservations=1&format=csv');
+    const r=await fetch('/api/boi-rate');
     const t=await r.text();
     const lines=t.trim().split('\n');
     if(lines.length>1){
