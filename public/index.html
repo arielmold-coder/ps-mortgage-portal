@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>פורטל יועצי משכנתאות | פסטרנק שהם</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f4f6;color:#222;direction:rtl}
+  :root{--maroon:#6B1A28;--gold:#B8974D;--light:#fff;--bg:#f4f4f6;--card:#fff;--border:#ddd;--text:#222;--muted:#666}
+  header{background:var(--maroon);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:1.25rem;font-weight:700}
+  header .sub{font-size:.8rem;opacity:.8;margin-top:2px}
+  .boi-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:6px 14px;text-align:center}
+  .boi-badge .lbl{font-size:.7rem;opacity:.8}
+  .boi-badge .val{font-size:1.3rem;font-weight:700;color:#ffd}
+  .refresh-btn{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.75rem;margin-top:4px;width:100%}
+  .refresh-btn:hover{background:rgba(255,255,255,.1)}
+  #refresh-status{font-size:.68rem;color:rgba(255,255,255,.55);text-align:center;margin-top:2px}
+  .statusbar{background:#fff;border-bottom:1px solid #eee;padding:5px 20px;font-size:.72rem;color:#888;display:flex;gap:16px;flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:#27ae60;display:inline-block;margin-left:3px}
+  .dot.amber{background:#f39c12}
+  .tabs{display:flex;background:#fff;border-bottom:2px solid #ddd;overflow-x:auto;padding:0 12px}
+  .tab-btn{padding:10px 14px;border:none;background:none;cursor:pointer;font-size:.82rem;color:#666;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px;font-weight:500;transition:.15s}
+  .tab-btn.active{color:var(--maroon);border-bottom-color:var(--maroon);font-weight:700}
+  .tab-btn:hover:not(.active){color:#333;border-bottom-color:#ccc}
+  .content{padding:18px;max-width:1400px;margin:0 auto}
+  .tab-pane{display:none}
+  .tab-pane.active{display:block}
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;margin-bottom:18px}
+  .kpi{background:#fff;border-radius:10px;padding:13px 15px;border:1px solid #ddd;text-align:center}
+  .kpi .lbl{font-size:.71rem;color:#666;margin-bottom:4px}
+  .kpi .val{font-size:1.55rem;font-weight:700;color:var(--maroon)}
+  .kpi .sub{font-size:.68rem;color:#999;margin-top:2px}
+  .kpi.gold .val{color:var(--gold)}
+  .card{background:#fff;border-radius:10px;padding:16px;border:1px solid #ddd;margin-bottom:14px}
+  .card h3{font-size:.9rem;color:var(--maroon);margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid #eee;font-weight:700}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.two-col{grid-template-columns:1fr}}
+  /* CRITICAL: explicit height for chart containers */
+  .ch{position:relative;width:100%;height:270px}
+  .ch.tall{height:330px}
+  .ch.sm{height:210px}
+  table{width:100%;border-collapse:collapse;font-size:.81rem}
+  th{background:#f8f0f2;color:var(--maroon);padding:7px 9px;text-align:right;font-weight:600;white-space:nowrap}
+  td{padding:6px 9px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+  tr:hover td{background:#fdf7f8}
+  .rich{color:#c0392b;font-weight:600}.cheap{color:#27ae60;font-weight:600}.neutral{color:#666}
+  .input-group{margin-bottom:12px}
+  .input-group label{display:block;font-size:.78rem;color:#666;margin-bottom:4px;font-weight:600}
+  .input-group input,.input-group select{width:100%;padding:8px 11px;border:1px solid #ddd;border-radius:7px;font-size:.88rem;direction:rtl}
+  .input-group input:focus,.input-group select:focus{outline:none;border-color:var(--maroon)}
+  .calc-result{background:linear-gradient(135deg,#f8f0f2,#fff);border:1px solid #dcc;border-radius:10px;padding:18px;text-align:center;margin-top:8px}
+  .calc-result .big{font-size:2.1rem;font-weight:700;color:var(--maroon)}
+  .calc-result .sub{font-size:.78rem;color:#888;margin-top:5px}
+  .btn{background:var(--maroon);color:#fff;border:none;padding:9px 20px;border-radius:7px;cursor:pointer;font-size:.88rem;font-weight:600;width:100%;margin-top:6px}
+  .btn:hover{background:#8b2235}
+  .rate-card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px;text-align:center}
+  .rate-card .type{font-size:.73rem;color:#666;margin-bottom:3px}
+  .rate-card .rate{font-size:1.85rem;font-weight:700}
+  .rate-card .desc{font-size:.7rem;color:#888;margin-top:3px}
+  .rate-card.ni .rate{color:#6B1A28}
+  .rate-card.cpi .rate{color:#B8974D}
+  .district-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+  .district-card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px;text-align:center}
+  .district-card .name{font-size:.76rem;color:#666;margin-bottom:5px}
+  .district-card .yoy{font-size:1.45rem;font-weight:700}
+  .pos{color:#c0392b}.neg{color:#27ae60}.flat{color:#999}
+  .tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:.71rem;font-weight:600;margin:1px}
+  .tag.green{background:#e8f5e9;color:#2e7d32}.tag.red{background:#fce4ec;color:#c62828}.tag.gold{background:#fff8e1;color:#f57f17}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="sub">פסטרנק שהם | בית השקעות</div>
+    <h1>🏠 פורטל יועצי משכנתאות</h1>
+  </div>
+  <div style="text-align:center">
+    <div class="boi-badge">
+      <div class="lbl">ריבית בנק ישראל</div>
+      <div class="val" id="boi-rate-val">4.50%</div>
+      <div class="lbl">פריים: <span id="prime-val">6.00%</span></div>
+    </div>
+    <button class="refresh-btn" onclick="refreshBOI()">🔄 רענן ריבית BOI</button>
+    <div id="refresh-status">נתוני ניירות: 19.05.2026</div>
+  </div>
+</header>
+
+<div class="statusbar">
+  <span><span class="dot"></span> NSS שקלי RMSE: 0.030%</span>
+  <span><span class="dot"></span> NSS צמוד RMSE: 0.040%</span>
+  <span><span class="dot amber"></span> ריביות בנקים: פבר׳ 2026</span>
+  <span><span class="dot amber"></span> מחירי דיור: פבר׳ 2026</span>
+  <span><span class="dot"></span> CPI: מרץ 2026</span>
+  <span>מקמ: 12 | שחר: 16 | גליל: 13</span>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 לוח ראשי</button>
+  <button class="tab-btn" onclick="showTab('curves',this)">📈 עקומי ריבית</button>
+  <button class="tab-btn" onclick="showTab('makam',this)">⚡ מקמ ומדיניות</button>
+  <button class="tab-btn" onclick="showTab('mortgage',this)">🏦 מחשבון משכנתא</button>
+  <button class="tab-btn" onclick="showTab('bankrates',this)">🏛️ ריביות בנקים</button>
+  <button class="tab-btn" onclick="showTab('cpi',this)">📉 CPI ואינפלציה</button>
+  <button class="tab-btn" onclick="showTab('housing',this)">🏘️ מחירי דיור</button>
+  <button class="tab-btn" onclick="showTab('bonds',this)">📋 אג"ח ממשלתי</button>
+  <button class="tab-btn" onclick="showTab('guide',this)">📖 מדריך יועץ</button>
+</div>
+
+<div class="content">
+
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-pane active">
+  <div class="kpi-row">
+    <div class="kpi"><div class="lbl">ריבית בנק ישראל</div><div class="val" id="k-boi">4.50%</div><div class="sub">ללא שינוי</div></div>
+    <div class="kpi gold"><div class="lbl">ריבית פריים</div><div class="val" id="k-prime">6.00%</div><div class="sub">BOI + 1.5%</div></div>
+    <div class="kpi"><div class="lbl">משכנתא שקלית ממוצע</div><div class="val">6.69%</div><div class="sub">BOI BIR_MRTG פבר׳ 2026</div></div>
+    <div class="kpi gold"><div class="lbl">משכנתא צמודה ממוצע</div><div class="val">3.26%</div><div class="sub">+ ציפיות אינפלציה</div></div>
+    <div class="kpi"><div class="lbl">CPI שנתי</div><div class="val">0.78%</div><div class="sub">מרץ 2026</div></div>
+    <div class="kpi"><div class="lbl">BE אינפלציה 10Y</div><div class="val">1.97%</div><div class="sub">NSS שקלי–צמוד</div></div>
+    <div class="kpi gold"><div class="lbl">שחר 10Y NSS</div><div class="val">4.14%</div><div class="sub">מנתוני שחר+מקמ</div></div>
+    <div class="kpi"><div class="lbl">גליל 10Y NSS</div><div class="val">2.16%</div><div class="sub">מנתוני גליל</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>עקום תשואה – NSS (שחר, גליל, BE) – מנתוני הקובץ</h3>
+      <div class="ch"><canvas id="ch-dash-curves"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>ריביות קדימה – מסלול מדיניות BOI גלום במקמ</h3>
+      <div class="ch"><canvas id="ch-dash-fwd"></canvas></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>ריביות משכנתא ממוצעות (BOI BIR_MRTG פבר׳ 2026)</h3>
+      <table>
+        <tr><th>מסלול</th><th>ריבית</th><th>הערה</th></tr>
+        <tr><td>שקלית קבועה עד 5Y</td><td><b>4.73%</b></td><td>לא צמוד</td></tr>
+        <tr><td>שקלית קבועה 5–15Y</td><td><b>4.74%</b></td><td>לא צמוד</td></tr>
+        <tr><td>שקלית משתנה (פריים)</td><td><b>5.64%</b></td><td>פריים – 0.36%</td></tr>
+        <tr><td>שקלית ממוצע כולל</td><td><b>6.69%</b></td><td>BOI ממוצע</td></tr>
+        <tr><td>צמודה קבועה</td><td><b>3.25%</b></td><td>+ ציפיות אינפלציה</td></tr>
+        <tr><td>צמודה משתנה</td><td><b>3.45%</b></td><td>+ מדד בפועל</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>מחירי דיור – שינוי שנתי לפי מחוז (BOI)</h3>
+      <div class="ch sm"><canvas id="ch-dash-housing"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- CURVES -->
+<div id="tab-curves" class="tab-pane">
+  <div class="card">
+    <h3>עקומי תשואה NSS – שקלי (שחר+מקמ), צמוד (גליל), Breakeven | נתוני יום 19.05.2026</h3>
+    <div class="ch tall"><canvas id="ch-all-curves"></canvas></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>טבלת עקום NSS</h3>
+      <table>
+        <tr><th>מח"מ</th><th>שקלי NSS</th><th>צמוד NSS</th><th>BE אינפלציה</th></tr>
+        <tr><td>3 חודשים</td><td>3.74%</td><td>1.94%</td><td>1.80%</td></tr>
+        <tr><td>6 חודשים</td><td>3.66%</td><td>1.92%</td><td>1.75%</td></tr>
+        <tr><td>1 שנה</td><td>3.67%</td><td>1.87%</td><td>1.79%</td></tr>
+        <tr><td>2 שנים</td><td>3.71%</td><td>1.83%</td><td>1.88%</td></tr>
+        <tr><td>3 שנים</td><td>3.72%</td><td>1.83%</td><td>1.89%</td></tr>
+        <tr><td>5 שנים</td><td>3.79%</td><td>1.90%</td><td>1.90%</td></tr>
+        <tr><td>7 שנים</td><td>3.92%</td><td>2.00%</td><td>1.92%</td></tr>
+        <tr><td>10 שנים</td><td>4.14%</td><td>2.16%</td><td>1.97%</td></tr>
+        <tr><td>15 שנים</td><td>4.40%</td><td>2.34%</td><td>2.06%</td></tr>
+        <tr><td>20 שנים</td><td>4.56%</td><td>2.39%</td><td>2.17%</td></tr>
+        <tr><td>30 שנים</td><td>4.73%</td><td>2.31%</td><td>2.42%</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>פרמטרי מודל NSS</h3>
+      <table>
+        <tr><th>פרמטר</th><th>שקלי</th><th>צמוד</th></tr>
+        <tr><td>β₀ (ארוך)</td><td>5.076%</td><td>1.538%</td></tr>
+        <tr><td>β₁ (שיפוע)</td><td>–1.098%</td><td>0.435%</td></tr>
+        <tr><td>β₂ (גבשושית 1)</td><td>–1.727%</td><td>10.000%</td></tr>
+        <tr><td>β₃ (גבשושית 2)</td><td>–3.601%</td><td>–8.567%</td></tr>
+        <tr><td>τ₁</td><td>0.376</td><td>6.701</td></tr>
+        <tr><td>τ₂</td><td>2.582</td><td>5.055</td></tr>
+        <tr><td><b>RMSE</b></td><td><b>0.030%</b></td><td><b>0.040%</b></td></tr>
+        <tr><td>ניירות</td><td>16 שחר + 12 מקמ</td><td>13 גליל</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MAKAM -->
+<div id="tab-makam" class="tab-pane">
+  <div class="two-col">
+    <div class="card">
+      <h3>עקום מקמ – תשואות (12 ניירות, נתוני קובץ 19.05.2026)</h3>
+      <div class="ch"><canvas id="ch-makam"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>ריביות קדימה (Forward) – גלום במקמ</h3>
+      <div class="ch"><canvas id="ch-fwd"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>כל ניירות המקמ</h3>
+    <table>
+      <tr><th>שם נייר</th><th>ימים לפדיון</th><th>תשואה (%)</th><th>שער</th><th>שינוי יומי</th><th>פדיון</th></tr>
+      <tr><td>מקמ 616</td><td>14</td><td>3.99%</td><td>99.85</td><td class="cheap">+0.01</td><td>03.06.26</td></tr>
+      <tr><td>מקמ 726</td><td>49</td><td>3.73%</td><td>99.51</td><td class="cheap">+0.02</td><td>08.07.26</td></tr>
+      <tr><td>מקמ 816</td><td>77</td><td>3.73%</td><td>99.23</td><td class="cheap">+0.02</td><td>05.08.26</td></tr>
+      <tr><td>מקמ 916</td><td>105</td><td>3.70%</td><td>98.96</td><td class="cheap">+0.03</td><td>02.09.26</td></tr>
+      <tr><td>מקמ 1016</td><td>140</td><td>3.74%</td><td>98.60</td><td class="cheap">+0.02</td><td>07.10.26</td></tr>
+      <tr><td>מקמ 1116</td><td>168</td><td>3.68%</td><td>98.35</td><td class="cheap">+0.01</td><td>04.11.26</td></tr>
+      <tr><td>מקמ 1216</td><td>196</td><td>3.70%</td><td>98.07</td><td class="cheap">+0.02</td><td>02.12.26</td></tr>
+      <tr><td>מקמ 117</td><td>231</td><td>3.68%</td><td>97.74</td><td class="cheap">+0.01</td><td>06.01.27</td></tr>
+      <tr><td>מקמ 217</td><td>259</td><td>3.69%</td><td>97.46</td><td class="neutral">0.00</td><td>03.02.27</td></tr>
+      <tr><td>מקמ 317</td><td>287</td><td>3.65%</td><td>97.22</td><td class="cheap">+0.03</td><td>03.03.27</td></tr>
+      <tr><td>מקמ 417</td><td>322</td><td>3.66%</td><td>96.88</td><td class="neutral">0.00</td><td>07.04.27</td></tr>
+      <tr><td>מקמ 517</td><td>350</td><td>3.65%</td><td>96.62</td><td class="cheap">+0.01</td><td>05.05.27</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>פרשנות מדיניות</h3>
+    <p style="font-size:.84rem;line-height:1.75;color:#444">
+      עקום מקמ שטוח ב-<b>3.65%–3.99%</b> לכל הטווחים עד שנה. ריביות הקדימה נעות סביב <b>3.6%–3.9%</b>,
+      מה שמגלם ציפייה להפחתת ריבית אחת (מ-4.5% לכ-3.75%) בשנה הקרובה.
+      שחר 10Y ב-4.14% = מרווח <b>+64bp מעל BOI</b> – פרמיית טווח גבוהה.
+    </p>
+  </div>
+</div>
+
+<!-- MORTGAGE CALCULATOR -->
+<div id="tab-mortgage" class="tab-pane">
+  <div class="two-col">
+    <div class="card">
+      <h3>מחשבון תשלום חודשי</h3>
+      <div class="input-group"><label>סכום הלוואה (₪)</label><input type="number" id="loan-amt" value="1000000" step="50000" oninput="calcMortgage()"></div>
+      <div class="input-group"><label>תקופה (שנים)</label><input type="number" id="loan-yrs" value="25" min="5" max="30" oninput="calcMortgage()"></div>
+      <div class="input-group"><label>מסלול</label>
+        <select id="loan-track" onchange="setTrack()">
+          <option value="4.73">שקלי קבוע עד 5Y – 4.73%</option>
+          <option value="4.74">שקלי קבוע 5–15Y – 4.74%</option>
+          <option value="5.64">פריים משתנה – 5.64%</option>
+          <option value="6.00">פריים – 6.00%</option>
+          <option value="3.25">צמוד קבוע – 3.25%+מדד</option>
+          <option value="3.45">צמוד משתנה – 3.45%+מדד</option>
+          <option value="">הזנה ידנית</option>
+        </select>
+      </div>
+      <div class="input-group"><label>ריבית שנתית (%)</label><input type="number" id="loan-rate" value="4.73" step="0.01" oninput="calcMortgage()"></div>
+      <div class="calc-result">
+        <div class="sub">תשלום חודשי</div>
+        <div class="big" id="monthly-pmt">₪ 5,626</div>
+        <div class="sub" id="total-pmt">סה"כ: ₪ 1,687,800</div>
+        <div class="sub" id="total-int">ריבית: ₪ 687,800</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>השוואת מסלולים – מיליון ₪ ל-25 שנה</h3>
+      <div class="ch"><canvas id="ch-compare"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ניתוח רגישות – תשלום חודשי לפי ריבית (מיליון ₪, 25 שנה)</h3>
+    <div class="ch sm"><canvas id="ch-sensitivity"></canvas></div>
+  </div>
+</div>
+
+<!-- BANK RATES -->
+<div id="tab-bankrates" class="tab-pane">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px">
+    <div class="rate-card ni"><div class="type">שקלית – ממוצע כולל</div><div class="rate">6.69%</div><div class="desc">BOI BIR_MRTG פבר׳ 2026</div></div>
+    <div class="rate-card ni"><div class="type">שקלית קבועה עד 5Y</div><div class="rate">4.73%</div><div class="desc">לא צמוד, קבוע</div></div>
+    <div class="rate-card ni"><div class="type">שקלית קבועה 5–15Y</div><div class="rate">4.74%</div><div class="desc">לא צמוד, קבוע</div></div>
+    <div class="rate-card ni"><div class="type">שקלית משתנה</div><div class="rate">5.64%</div><div class="desc">פריים – 0.36%</div></div>
+    <div class="rate-card cpi"><div class="type">צמודה – ממוצע כולל</div><div class="rate">3.26%</div><div class="desc">+ ציפיות מדד</div></div>
+    <div class="rate-card cpi"><div class="type">צמודה קבועה</div><div class="rate">3.25%</div><div class="desc">+ מדד בפועל</div></div>
+    <div class="rate-card cpi"><div class="type">צמודה משתנה</div><div class="rate">3.45%</div><div class="desc">+ מדד בפועל</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>מגמת ריביות בנקים – שנה אחרונה</h3>
+      <div class="ch"><canvas id="ch-bank-trend"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>פרמיה מעל ריבית BOI (4.5%)</h3>
+      <table>
+        <tr><th>מסלול</th><th>ריבית</th><th>פרמיה</th></tr>
+        <tr><td>שקלי קבוע עד 5Y</td><td>4.73%</td><td><b>+0.23%</b></td></tr>
+        <tr><td>שקלי קבוע 5–15Y</td><td>4.74%</td><td><b>+0.24%</b></td></tr>
+        <tr><td>פריים משתנה</td><td>5.64%</td><td><b>+1.14%</b></td></tr>
+        <tr><td>צמוד קבוע</td><td>3.25%</td><td><span class="cheap">–1.25%</span> + מדד</td></tr>
+        <tr><td>צמוד משתנה</td><td>3.45%</td><td><span class="cheap">–1.05%</span> + מדד</td></tr>
+      </table>
+      <p style="margin-top:10px;font-size:.76rem;color:#999">מקור: BOI BIR_MRTG_99 | פבר׳ 2026</p>
+    </div>
+  </div>
+</div>
+
+<!-- CPI -->
+<div id="tab-cpi" class="tab-pane">
+  <div class="kpi-row">
+    <div class="kpi"><div class="lbl">CPI שנתי מרץ 2026</div><div class="val">0.78%</div><div class="sub">יעד: 1%–3%</div></div>
+    <div class="kpi gold"><div class="lbl">CPI חודשי מרץ 2026</div><div class="val">–1.11%</div><div class="sub">עונתי</div></div>
+    <div class="kpi"><div class="lbl">BE 5Y</div><div class="val">1.90%</div><div class="sub">NSS</div></div>
+    <div class="kpi gold"><div class="lbl">BE 10Y</div><div class="val">1.97%</div><div class="sub">NSS</div></div>
+    <div class="kpi"><div class="lbl">BE 30Y</div><div class="val">2.42%</div><div class="sub">NSS</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>CPI שנה על שנה – 24 חודשים (BOI ECON_IND)</h3>
+      <div class="ch"><canvas id="ch-cpi-yoy"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>CPI חודש על חודש</h3>
+      <div class="ch"><canvas id="ch-cpi-mom"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>ציפיות אינפלציה – Breakeven (NSS שקלי פחות צמוד)</h3>
+    <div class="ch sm"><canvas id="ch-be"></canvas></div>
+  </div>
+</div>
+
+<!-- HOUSING -->
+<div id="tab-housing" class="tab-pane">
+  <div class="kpi-row">
+    <div class="kpi"><div class="lbl">מדד ארצי פבר׳ 2026</div><div class="val">601.4</div><div class="sub">BOI REAL_ES_DF</div></div>
+    <div class="kpi gold"><div class="lbl">שינוי שנתי ארצי</div><div class="val" style="color:#27ae60">–1.18%</div><div class="sub">ירידה</div></div>
+    <div class="kpi"><div class="lbl">ירושלים YoY</div><div class="val">+4.23%</div><div class="sub">חזק ביותר</div></div>
+    <div class="kpi gold"><div class="lbl">תל אביב YoY</div><div class="val" style="color:#27ae60">–3.51%</div><div class="sub">ירידה</div></div>
+  </div>
+  <div class="district-grid">
+    <div class="district-card"><div class="name">ירושלים</div><div class="yoy pos">+4.23% ↑</div></div>
+    <div class="district-card"><div class="name">צפון</div><div class="yoy pos">+1.63% ↑</div></div>
+    <div class="district-card"><div class="name">חיפה</div><div class="yoy pos">+0.67% ↑</div></div>
+    <div class="district-card"><div class="name">דרום</div><div class="yoy flat">0.00% →</div></div>
+    <div class="district-card"><div class="name">ארצי</div><div class="yoy neg">–1.18% ↓</div></div>
+    <div class="district-card"><div class="name">מרכז</div><div class="yoy neg">–2.87% ↓</div></div>
+    <div class="district-card"><div class="name">תל אביב</div><div class="yoy neg">–3.51% ↓</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>מדד מחירי דיור ארצי – 18 חודשים</h3>
+      <div class="ch"><canvas id="ch-housing-nat"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>שינוי שנתי לפי מחוז</h3>
+      <div class="ch"><canvas id="ch-housing-dist"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- BONDS -->
+<div id="tab-bonds" class="tab-pane">
+  <div class="card">
+    <h3>אג"ח ממשלתי – יקר/זול מול NSS (נתונים מקובץ אגח.xlsx)</h3>
+    <table id="bond-table">
+      <tr><th>שם נייר</th><th>מח"מ</th><th>תשואה שוק</th><th>NSS Fair</th><th>יקר/זול</th><th>סוג</th></tr>
+    </table>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h3>שחר (שקלי) – שוק מול עקום NSS</h3>
+      <div class="ch"><canvas id="ch-shahar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>גליל (צמוד מדד) – שוק מול עקום NSS</h3>
+      <div class="ch"><canvas id="ch-galil"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- GUIDE -->
+<div id="tab-guide" class="tab-pane">
+  <div class="two-col">
+    <div class="card">
+      <h3>מסלולי משכנתא – מדריך מהיר</h3>
+      <table>
+        <tr><th>מסלול</th><th>ריבית</th><th>סיכון</th><th>מתאים ל</th></tr>
+        <tr><td>שקלי קבוע עד 5Y</td><td>4.73%</td><td><span class="tag green">נמוך</span></td><td>יציבות קצר טווח</td></tr>
+        <tr><td>שקלי קבוע 5–15Y</td><td>4.74%</td><td><span class="tag green">נמוך</span></td><td>ביטחון תשלום</td></tr>
+        <tr><td>פריים משתנה</td><td>5.64%</td><td><span class="tag gold">בינוני</span></td><td>ציפייה להפחתות</td></tr>
+        <tr><td>צמוד קבוע</td><td>3.25%+מדד</td><td><span class="tag gold">בינוני</span></td><td>הגנה אינפלציה</td></tr>
+        <tr><td>צמוד משתנה</td><td>3.45%+מדד</td><td><span class="tag red">גבוה</span></td><td>ספקולנטים</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>המלצות אסטרטגיות – מצב שוק נוכחי</h3>
+      <div style="font-size:.84rem;line-height:1.85;color:#444">
+        <p><b>🎯 BOI 4.5%</b> – צפי להפחתה אחת בשנה הקרובה לפי מקמ</p>
+        <p><b>📈 עקום שטוח–חיובי</b> – מרווח 10Y–2Y: 43bp</p>
+        <p><b>💡 CPI 0.78%</b> – מתחת ליעד. BE שוק: ~2%</p>
+        <p><b>🏘️ דיור</b> – ירידה ארצית 1.2%, ירושלים חזקה</p>
+        <hr style="margin:10px 0;border-color:#eee">
+        <p><b>לקוח שמרן:</b> <span class="tag green">שקלי קבוע 5–15Y @ 4.74%</span></p>
+        <p><b>ספקולטיבי:</b> <span class="tag gold">פריים @ 5.64%</span> + ציפייה להפחתה</p>
+        <p><b>הגנת קנייה:</b> <span class="tag gold">צמוד קבוע @ 3.25%+מדד</span></p>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>שאלות נפוצות ליועצים</h3>
+    <table>
+      <tr><th>שאלה</th><th>תשובה</th></tr>
+      <tr><td>האם כדאי פריים?</td><td>בסביבת ציפיות להפחתה – כן, אך עם כרית של 3% מעל ההחזר</td></tr>
+      <tr><td>כמה להצמיד למדד?</td><td>עד 30% – אינפלציה 0.78% כיום, BE שוק 2%</td></tr>
+      <tr><td>אורך אופטימלי?</td><td>25 שנה – שיווי משקל טוב. 30 שנה = +10% ריבית</td></tr>
+      <tr><td>מתי לשקול מחזור?</td><td>ריבית ירדה 0.5%+ ועמלת פירעון מוקדם פחות מהחיסכון</td></tr>
+      <tr><td>ציפיות ריבית?</td><td>מקמ מגלם ~3.75% בשנה הקרובה. שחר 10Y ב-4.14%</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+// ====================================================
+// DATA from Excel files + NSS analysis (19.05.2026)
+// ====================================================
+const D = {
+  nom: {0.25:3.738,0.5:3.664,0.75:3.651,1:3.668,1.5:3.693,2:3.710,3:3.720,4:3.751,5:3.792,6:3.857,7:3.924,8:3.994,9:4.066,10:4.135,12:4.263,15:4.398,20:4.560,25:4.675,30:4.731},
+  real:{0.25:1.942,0.5:1.915,0.75:1.892,1:1.874,1.5:1.848,2:1.833,3:1.830,4:1.860,5:1.895,6:1.949,7:2.002,8:2.054,9:2.109,10:2.163,12:2.261,15:2.338,20:2.392,25:2.384,30:2.311},
+  be:  {0.25:1.796,0.5:1.749,0.75:1.759,1:1.794,1.5:1.845,2:1.877,3:1.890,4:1.891,5:1.897,6:1.908,7:1.922,8:1.940,9:1.957,10:1.972,12:2.002,15:2.060,20:2.168,25:2.291,30:2.420},
+
+  makam:[
+    {nm:'מקמ 616',d:14,y:3.99},{nm:'מקמ 726',d:49,y:3.73},{nm:'מקמ 816',d:77,y:3.73},
+    {nm:'מקמ 916',d:105,y:3.70},{nm:'מקמ 1016',d:140,y:3.74},{nm:'מקמ 1116',d:168,y:3.68},
+    {nm:'מקמ 1216',d:196,y:3.70},{nm:'מקמ 117',d:231,y:3.68},{nm:'מקמ 217',d:259,y:3.69},
+    {nm:'מקמ 317',d:287,y:3.65},{nm:'מקמ 417',d:322,y:3.66},{nm:'מקמ 517',d:350,y:3.65}
+  ],
+
+  forwards:[
+    {d:'08.07',f:3.626},{d:'05.08',f:3.730},{d:'02.09',f:3.618},{d:'07.10',f:3.860},
+    {d:'04.11',f:3.380},{d:'02.12',f:3.820},{d:'06.01',f:3.568},{d:'03.02',f:3.773},
+    {d:'03.03',f:3.435},{d:'07.04',f:3.667},{d:'05.05',f:3.595}
+  ],
+
+  shahar:[
+    {nm:'שקלי 1026',dur:0.45,y:3.640,fv:3.711,rc:-0.071},
+    {nm:'שקלי 0327',dur:0.86,y:3.653,fv:3.668,rc:-0.015},
+    {nm:'שקלי 0927',dur:1.33,y:3.649,fv:3.678,rc:-0.029},
+    {nm:'שקלי 0728',dur:2.08,y:3.702,fv:3.707,rc:-0.005},
+    {nm:'שקלי 0928',dur:2.29,y:3.699,fv:3.710,rc:-0.011},
+    {nm:'שקלי 0229',dur:2.67,y:3.723,fv:3.715,rc:+0.008},
+    {nm:'שקלי 0829',dur:3.03,y:3.729,fv:3.721,rc:+0.008},
+    {nm:'שקלי 0330',dur:3.80,y:3.767,fv:3.742,rc:+0.025},
+    {nm:'שקלי 0731',dur:4.75,y:3.777,fv:3.772,rc:+0.005},
+    {nm:'שקלי 0432',dur:5.74,y:3.826,fv:3.814,rc:+0.012},
+    {nm:'שקלי 0335',dur:7.60,y:3.971,fv:3.945,rc:+0.026},
+    {nm:'שקלי 1035',dur:7.85,y:4.001,fv:3.963,rc:+0.038},
+    {nm:'שקלי 0537',dur:9.93,y:4.105,fv:4.128,rc:-0.023},
+    {nm:'שקלי 0142',dur:11.11,y:4.202,fv:4.207,rc:-0.005},
+    {nm:'שקלי 0347',dur:14.46,y:4.363,fv:4.369,rc:-0.006},
+    {nm:'שקלי 1152',dur:17.37,y:4.505,fv:4.487,rc:+0.018}
+  ],
+
+  galil:[
+    {nm:'צמוד 0527',dur:1.02,y:1.859,fv:1.873,rc:-0.014},
+    {nm:'צמוד 1028',dur:2.42,y:1.870,fv:1.833,rc:+0.037},
+    {nm:'צמוד 0529',dur:3.00,y:1.804,fv:1.831,rc:-0.027},
+    {nm:'צמוד 0431',dur:4.76,y:1.957,fv:1.895,rc:+0.062},
+    {nm:'צמוד 1131',dur:5.52,y:1.833,fv:1.921,rc:-0.088},
+    {nm:'צמוד 1033',dur:7.02,y:1.985,fv:2.001,rc:-0.016},
+    {nm:'צמוד 0536',dur:8.32,y:2.077,fv:2.071,rc:+0.006},
+    {nm:'צמוד 0837',dur:10.23,y:2.209,fv:2.170,rc:+0.039},
+    {nm:'צמוד 0841',dur:12.54,y:2.286,fv:2.263,rc:+0.023},
+    {nm:'צמוד 0545',dur:16.98,y:2.337,fv:2.337,rc:0.000},
+    {nm:'צמוד 1151',dur:23.47,y:2.374,fv:2.383,rc:-0.009},
+    {nm:'צמוד 0456',dur:22.41,y:2.406,fv:2.389,rc:+0.017}
+  ],
+
+  cpiYoy:{"2024-04":-1.43,"2024-05":-1.84,"2024-06":-2.16,"2024-07":-2.25,"2024-08":-2.69,"2024-09":-1.93,"2024-10":0.67,"2024-11":1.39,"2024-12":1.33,"2025-01":0.78,"2025-02":0.90,"2025-03":0.89,"2025-04":0.63,"2025-05":0.44,"2025-06":-0.52,"2025-07":0.87,"2025-08":1.19,"2025-09":1.28,"2025-10":1.59,"2025-11":2.11,"2025-12":2.02,"2026-01":2.44,"2026-02":2.08,"2026-03":0.78},
+  cpiMom:{"2024-10":0.17,"2024-11":0.12,"2024-12":0.41,"2025-01":0.05,"2025-02":0.10,"2025-03":0.17,"2025-04":-0.30,"2025-05":-0.14,"2025-06":-0.99,"2025-07":1.46,"2025-08":0.02,"2025-09":0.24,"2025-10":0.48,"2025-11":0.63,"2025-12":0.32,"2026-01":0.46,"2026-02":-0.25,"2026-03":-1.11},
+  housingNat:{"2024-09":593.6,"2024-10":596.6,"2024-11":599.0,"2024-12":606.2,"2025-01":609.8,"2025-02":608.6,"2025-03":607.4,"2025-04":605.0,"2025-05":602.6,"2025-06":602.0,"2025-07":600.8,"2025-08":597.2,"2025-09":593.0,"2025-10":596.0,"2025-11":600.8,"2025-12":600.2,"2026-01":599.6,"2026-02":601.4},
+  housingDist:{JRM:{n:'ירושלים',v:4.23},NORTH:{n:'צפון',v:1.63},HAIFA:{n:'חיפה',v:0.67},SOUTH:{n:'דרום',v:0.00},T:{n:'ארצי',v:-1.18},CNR:{n:'מרכז',v:-2.87},TLV:{n:'תל אביב',v:-3.51}},
+  bankNI:[6.9,6.85,6.8,6.78,6.75,6.73,6.72,6.74,6.72,6.71,6.70,6.70,6.70,6.70,6.69,6.69,6.69,6.69],
+  bankCPI:[3.35,3.32,3.30,3.29,3.28,3.27,3.27,3.26,3.26,3.26,3.26,3.26,3.26,3.26,3.26,3.26,3.26,3.26],
+  bankLabels:['ספ׳24','אוק׳24','נוב׳24','דצ׳24','ינ׳25','פבר׳25','מרץ25','אפר׳25','מאי25','יונ׳25','יול׳25','אוג׳25','ספ׳25','אוק׳25','נוב׳25','דצ׳25','ינ׳26','פבר׳26']
+};
+
+// ====================================================
+// CHART ENGINE
+// ====================================================
+const CI = {}; // chart instances
+const INIT = {}; // init flags
+const M='#6B1A28',G='#B8974D',BL='#2980b9',GR='#27ae60',RD='#e74c3c';
+
+function mkChart(id, cfg) {
+  if (CI[id]) CI[id].destroy();
+  const el = document.getElementById(id);
+  if (!el) return;
+  CI[id] = new Chart(el.getContext('2d'), cfg);
+  return CI[id];
+}
+
+const baseOpts = (extra={}) => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{position:'top',rtl:true,labels:{font:{size:11},boxWidth:13,padding:8}}},
+  scales:{
+    x:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,.06)'}},
+    y:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,.06)'}}
+  },
+  ...extra
+});
+
+function nomArr() { const k=Object.keys(D.nom).map(Number).sort((a,b)=>a-b); return {k,v:k.map(t=>D.nom[t])}; }
+function realArr(){ const k=Object.keys(D.real).map(Number).sort((a,b)=>a-b); return {k,v:k.map(t=>D.real[t])}; }
+function beArr()  { const k=Object.keys(D.be).map(Number).sort((a,b)=>a-b); return {k,v:k.map(t=>D.be[t])}; }
+
+// ====================================================
+// TAB LOGIC
+// ====================================================
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(()=>initTab(name), 60);
+}
+
+function initTab(name) {
+  if (INIT[name]) return;
+  INIT[name] = true;
+  if (name==='dashboard') initDash();
+  else if (name==='curves') initCurves();
+  else if (name==='makam') initMakam();
+  else if (name==='mortgage') initMortgage();
+  else if (name==='bankrates') initBank();
+  else if (name==='cpi') initCPI();
+  else if (name==='housing') initHousing();
+  else if (name==='bonds') initBonds();
+}
+
+// ====================================================
+// DASHBOARD
+// ====================================================
+function initDash() {
+  const na=nomArr(),ra=realArr(),ba=beArr();
+  mkChart('ch-dash-curves',{type:'line',data:{
+    labels:na.k.map(t=>t+'Y'),
+    datasets:[
+      {label:'שקלי NSS',data:na.v,borderColor:M,borderWidth:2.5,pointRadius:3,fill:false,tension:.4},
+      {label:'צמוד NSS',data:ra.v,borderColor:G,borderWidth:2.5,pointRadius:3,fill:false,tension:.4},
+      {label:'BE אינפלציה',data:ba.v,borderColor:BL,borderWidth:1.5,pointRadius:2,borderDash:[5,3],fill:false,tension:.4}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:9}}},y:{ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  mkChart('ch-dash-fwd',{type:'bar',data:{
+    labels:D.forwards.map(f=>f.d),
+    datasets:[
+      {label:'ריבית קדימה %',data:D.forwards.map(f=>f.f),backgroundColor:D.forwards.map(f=>f.f<4.25?'rgba(39,174,96,.75)':f.f<4.5?'rgba(184,151,77,.75)':'rgba(107,26,40,.75)'),borderRadius:4},
+      {label:'BOI 4.5%',type:'line',data:D.forwards.map(()=>4.5),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:9}},grid:{display:false}},y:{min:3.0,max:4.8,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  const dk=Object.keys(D.housingDist), dn=dk.map(k=>D.housingDist[k].n), dv=dk.map(k=>D.housingDist[k].v);
+  mkChart('ch-dash-housing',{type:'bar',data:{
+    labels:dn,
+    datasets:[{label:'שינוי שנתי %',data:dv,backgroundColor:dv.map(v=>v>0?'rgba(192,57,43,.75)':'rgba(39,174,96,.75)'),borderRadius:4}]},
+    options:baseOpts({indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>v.toFixed(1)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}},y:{ticks:{font:{size:9}}}}})
+  });
+}
+
+// ====================================================
+// CURVES
+// ====================================================
+function initCurves() {
+  const na=nomArr(),ra=realArr(),ba=beArr();
+  mkChart('ch-all-curves',{type:'line',data:{
+    labels:na.k.map(t=>t+'Y'),
+    datasets:[
+      {label:'שקלי NSS (שחר+מקמ)',data:na.v,borderColor:M,backgroundColor:'rgba(107,26,40,.06)',fill:true,borderWidth:2.5,pointRadius:4,tension:.4},
+      {label:'צמוד NSS (גליל)',data:ra.v,borderColor:G,backgroundColor:'rgba(184,151,77,.06)',fill:true,borderWidth:2.5,pointRadius:4,tension:.4},
+      {label:'Breakeven',data:ba.v,borderColor:BL,borderWidth:2,pointRadius:3,borderDash:[5,3],fill:false,tension:.4},
+      {label:'שחר (שוק)',type:'scatter',data:D.shahar.map(b=>({x:b.dur,y:b.y})),backgroundColor:M,pointRadius:5},
+      {label:'גליל (שוק)',type:'scatter',data:D.galil.map(b=>({x:b.dur,y:b.y})),backgroundColor:G,pointRadius:5,pointStyle:'triangle'}
+    ]},
+    options:baseOpts({scales:{x:{title:{display:true,text:'מח"מ (שנים)'},ticks:{font:{size:9}}},y:{title:{display:true,text:'תשואה %'},ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+}
+
+// ====================================================
+// MAKAM
+// ====================================================
+function initMakam() {
+  mkChart('ch-makam',{type:'line',data:{
+    labels:D.makam.map(m=>m.nm.replace('מקמ ','')),
+    datasets:[
+      {label:'תשואת מקמ %',data:D.makam.map(m=>m.y),borderColor:M,backgroundColor:'rgba(107,26,40,.07)',fill:true,borderWidth:2.5,pointRadius:5,tension:.3},
+      {label:'BOI 4.5%',data:D.makam.map(()=>4.5),borderColor:RD,borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:9}},grid:{display:false}},y:{min:3.4,max:4.8,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  mkChart('ch-fwd',{type:'bar',data:{
+    labels:D.forwards.map(f=>f.d),
+    datasets:[
+      {label:'Forward %',data:D.forwards.map(f=>f.f),backgroundColor:D.forwards.map(f=>f.f<4.25?'rgba(39,174,96,.8)':f.f<4.5?'rgba(184,151,77,.8)':'rgba(107,26,40,.8)'),borderRadius:4},
+      {label:'BOI 4.5%',type:'line',data:D.forwards.map(()=>4.5),borderColor:RD,borderWidth:2,pointRadius:0,fill:false,borderDash:[4,3]}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:9},maxRotation:30},grid:{display:false}},y:{min:3.0,max:5.0,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+}
+
+// ====================================================
+// MORTGAGE
+// ====================================================
+function initMortgage() {
+  const tracks=['שקלי קבוע עד 5Y','שקלי קבוע 5–15Y','פריים','צמוד קבוע','צמוד משתנה'];
+  const pmts=[5626,5632,6198,4870,4985];
+  mkChart('ch-compare',{type:'bar',data:{
+    labels:tracks,
+    datasets:[{label:'תשלום חודשי (₪)',data:pmts,backgroundColor:['rgba(107,26,40,.85)','rgba(107,26,40,.65)','rgba(184,151,77,.85)','rgba(39,174,96,.85)','rgba(39,174,96,.65)'],borderRadius:5}]},
+    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9},maxRotation:20},grid:{display:false}},y:{ticks:{callback:v=>'₪'+v.toLocaleString('he-IL'),font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  const rates=[3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0];
+  const pmtFn=r=>{const mo=r/100/12,n=25*12,p=1e6;return +(p*mo*Math.pow(1+mo,n)/(Math.pow(1+mo,n)-1)).toFixed(0);};
+  mkChart('ch-sensitivity',{type:'line',data:{
+    labels:rates.map(r=>r+'%'),
+    datasets:[{label:'תשלום חודשי (₪)',data:rates.map(pmtFn),borderColor:M,backgroundColor:'rgba(107,26,40,.07)',fill:true,borderWidth:2.5,pointRadius:5,tension:.4}]},
+    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'ריבית שנתית'}},y:{ticks:{callback:v=>'₪'+Number(v).toLocaleString('he-IL'),font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+  calcMortgage();
+}
+
+// ====================================================
+// BANK
+// ====================================================
+function initBank() {
+  mkChart('ch-bank-trend',{type:'line',data:{
+    labels:D.bankLabels,
+    datasets:[
+      {label:'שקלי ממוצע %',data:D.bankNI,borderColor:M,borderWidth:2.5,pointRadius:3,fill:false,tension:.3},
+      {label:'צמוד ממוצע %',data:D.bankCPI,borderColor:G,borderWidth:2.5,pointRadius:3,fill:false,tension:.3}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},y:{ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+}
+
+// ====================================================
+// CPI
+// ====================================================
+function initCPI() {
+  const yoyK=Object.keys(D.cpiYoy), yoyV=Object.values(D.cpiYoy);
+  mkChart('ch-cpi-yoy',{type:'bar',data:{
+    labels:yoyK.map(l=>l.slice(2)),
+    datasets:[
+      {label:'CPI YoY %',data:yoyV,backgroundColor:yoyV.map(v=>v<1?'rgba(41,128,185,.75)':v<3?'rgba(39,174,96,.75)':'rgba(231,76,60,.75)'),borderRadius:3},
+      {label:'יעד 3%',type:'line',data:yoyK.map(()=>3),borderColor:'rgba(231,76,60,.5)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false},
+      {label:'יעד 1%',type:'line',data:yoyK.map(()=>1),borderColor:'rgba(39,174,96,.5)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},y:{ticks:{callback:v=>v.toFixed(1)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  const momK=Object.keys(D.cpiMom), momV=Object.values(D.cpiMom);
+  mkChart('ch-cpi-mom',{type:'bar',data:{
+    labels:momK.map(l=>l.slice(2)),
+    datasets:[{label:'CPI MoM %',data:momV,backgroundColor:momV.map(v=>v>=0?'rgba(231,76,60,.75)':'rgba(39,174,96,.75)'),borderRadius:3}]},
+    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},y:{ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  const ba=beArr();
+  mkChart('ch-be',{type:'line',data:{
+    labels:ba.k.map(t=>t+'Y'),
+    datasets:[
+      {label:'BE אינפלציה %',data:ba.v,borderColor:BL,backgroundColor:'rgba(41,128,185,.07)',fill:true,borderWidth:2.5,pointRadius:4,tension:.4},
+      {label:'יעד BOI 2%',data:ba.k.map(()=>2),borderColor:'rgba(39,174,96,.6)',borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false}
+    ]},
+    options:baseOpts({scales:{x:{ticks:{font:{size:9}}},y:{min:1.5,max:2.7,ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+}
+
+// ====================================================
+// HOUSING
+// ====================================================
+function initHousing() {
+  const nk=Object.keys(D.housingNat), nv=Object.values(D.housingNat);
+  mkChart('ch-housing-nat',{type:'line',data:{
+    labels:nk.map(l=>l.slice(2)),
+    datasets:[{label:'מדד ארצי',data:nv,borderColor:M,backgroundColor:'rgba(107,26,40,.07)',fill:true,borderWidth:2.5,pointRadius:3,tension:.4}]},
+    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},y:{min:580,ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+
+  const dk=Object.keys(D.housingDist),dn=dk.map(k=>D.housingDist[k].n),dv=dk.map(k=>D.housingDist[k].v);
+  mkChart('ch-housing-dist',{type:'bar',data:{
+    labels:dn,
+    datasets:[{label:'שינוי שנתי %',data:dv,backgroundColor:dv.map(v=>v>0?'rgba(192,57,43,.75)':'rgba(39,174,96,.75)'),borderRadius:5}]},
+    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9}},grid:{display:false}},y:{ticks:{callback:v=>v.toFixed(1)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
+  });
+}
+
+// ====================================================
+// BONDS
+// ====================================================
+function initBonds() {
+  // fill table
+  const tbl = document.getElementById('bond-table');
+  [...D.shahar.map(b=>({...b,type:'שחר (שקלי)'})),...D.galil.map(b=>({...b,type:'גליל (צמוד)'}))]
+    .sort((a,b)=>a.dur-b.dur)
+    .forEach(b=>{
+      const cls=b.rc>0.02?'cheap':b.rc<-0.02?'rich':'neutral';
+      const txt=b.rc>0.02?`זול +${b.rc.toFixed(3)}%`:b.rc<-0.02?`יקר ${b.rc.toFixed(3)}%`:`±${b.rc.toFixed(3)}%`;
+      const r=tbl.insertRow();
+      r.innerHTML=`<td>${b.nm}</td><td>${b.dur.toFixed(2)}</td><td>${b.y.toFixed(3)}%</td><td>${b.fv.toFixed(3)}%</td><td class="${cls}">${txt}</td><td>${b.type}</td>`;
+    });
+
+  const na=nomArr();
+  mkChart('ch-shahar',{type:'scatter',data:{datasets:[
+    {label:'שחר שוק',data:D.shahar.map(b=>({x:b.dur,y:b.y})),backgroundColor:M,pointRadius:6},
+    {label:'NSS',type:'line',data:na.k.map(k=>({x:k,y:D.nom[k]})),borderColor:'rgba(107,26,40,.4)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,tension:.4}
+  ]},options:baseOpts({scales:{x:{title:{display:true,text:'מח"מ שנים'},ticks:{font:{size:9}}},y:{title:{display:true,text:'תשואה %'},ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})});
+
+  const ra=realArr();
+  mkChart('ch-galil',{type:'scatter',data:{datasets:[
+    {label:'גליל שוק',data:D.galil.map(b=>({x:b.dur,y:b.y})),backgroundColor:G,pointRadius:6,pointStyle:'triangle'},
+    {label:'NSS',type:'line',data:ra.k.map(k=>({x:k,y:D.real[k]})),borderColor:'rgba(184,151,77,.4)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,tension:.4}
+  ]},options:baseOpts({scales:{x:{title:{display:true,text:'מח"מ שנים'},ticks:{font:{size:9}}},y:{title:{display:true,text:'תשואה %'},ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})});
+}
+
+// ====================================================
+// MORTGAGE CALCULATOR
+// ====================================================
+function setTrack() {
+  const v = document.getElementById('loan-track').value;
+  if (v) document.getElementById('loan-rate').value = v;
+  calcMortgage();
+}
+function calcMortgage() {
+  const P=+(document.getElementById('loan-amt').value)||1e6;
+  const n=(+(document.getElementById('loan-yrs').value)||25)*12;
+  const r=(+(document.getElementById('loan-rate').value)||4.73)/100/12;
+  const pmt = r>0 ? P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1) : P/n;
+  const fmt=v=>'₪ '+Math.round(v).toLocaleString('he-IL');
+  document.getElementById('monthly-pmt').textContent=fmt(pmt);
+  document.getElementById('total-pmt').textContent='סה"כ: '+fmt(pmt*n);
+  document.getElementById('total-int').textContent='ריבית: '+fmt(pmt*n-P);
+}
+
+// ====================================================
+// LIVE BOI REFRESH
+// ====================================================
+async function refreshBOI() {
+  document.getElementById('refresh-status').textContent='מרענן...';
+  try {
+    const r=await fetch('https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/BR/1.0/MNT_RIB_BOI_D?lastNObservations=1&format=csv');
+    const t=await r.text();
+    const lines=t.trim().split('\n');
+    if(lines.length>1){
+      const cols=lines[lines.length-1].split(',');
+      const rate=parseFloat(cols[cols.length-1]);
+      if(!isNaN(rate)){
+        const prime=rate+1.5;
+        ['boi-rate-val','k-boi'].forEach(id=>document.getElementById(id).textContent=rate.toFixed(2)+'%');
+        ['prime-val','k-prime'].forEach(id=>document.getElementById(id).textContent=prime.toFixed(2)+'%');
+        document.getElementById('refresh-status').textContent='עודכן '+new Date().toLocaleTimeString('he-IL');
+      }
+    }
+  } catch(e){ document.getElementById('refresh-status').textContent='שגיאה – בדוק חיבור'; }
+}
+
+// ====================================================
+// INIT
+// ====================================================
+window.addEventListener('DOMContentLoaded',()=>{
+  calcMortgage();
+  setTimeout(()=>initTab('dashboard'),120);
+});
+</script>
+</body>
+</html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
