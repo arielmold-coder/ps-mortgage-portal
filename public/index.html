@@ -92,7 +92,7 @@
 <div class="statusbar">
   <span><span class="dot"></span> NSS שקלי RMSE: 0.030%</span>
   <span><span class="dot"></span> NSS צמוד RMSE: 0.040%</span>
-  <span><span class="dot amber"></span> ריביות בנקים: פבר׳ 2026</span>
+  <span><span class="dot amber"></span> ריביות בנקים: <span id="br-status-period">טוען...</span></span>
   <span><span class="dot amber"></span> מחירי דיור: פבר׳ 2026</span>
   <span><span class="dot"></span> CPI: <span id="cpi-ticker-period">מרץ 2026</span> — <span id="cpi-ticker-val">0.78%</span></span>
   <span>מקמ: 12 | שחר: 16 | גליל: 13</span>
@@ -276,31 +276,38 @@
 
 <!-- BANK RATES -->
 <div id="tab-bankrates" class="tab-pane">
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px">
-    <div class="rate-card ni"><div class="type">שקלית – ממוצע כולל</div><div class="rate">6.69%</div><div class="desc">BOI BIR_MRTG פבר׳ 2026</div></div>
-    <div class="rate-card ni"><div class="type">שקלית קבועה עד 5Y</div><div class="rate">4.73%</div><div class="desc">לא צמוד, קבוע</div></div>
-    <div class="rate-card ni"><div class="type">שקלית קבועה 5–15Y</div><div class="rate">4.74%</div><div class="desc">לא צמוד, קבוע</div></div>
-    <div class="rate-card ni"><div class="type">שקלית משתנה</div><div class="rate">5.64%</div><div class="desc">פריים – 0.36%</div></div>
-    <div class="rate-card cpi"><div class="type">צמודה – ממוצע כולל</div><div class="rate">3.26%</div><div class="desc">+ ציפיות מדד</div></div>
-    <div class="rate-card cpi"><div class="type">צמודה קבועה</div><div class="rate">3.25%</div><div class="desc">+ מדד בפועל</div></div>
-    <div class="rate-card cpi"><div class="type">צמודה משתנה</div><div class="rate">3.45%</div><div class="desc">+ מדד בפועל</div></div>
+  <!-- Live bank rates header -->
+  <div id="br-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px">
+    <div class="rate-card ni"><div class="type">ממוצע משכנתאות</div><div class="rate" id="br-avg-val">–</div><div class="desc" id="br-avg-period">טוען...</div></div>
+    <div class="rate-card ni"><div class="type">קבוע לא צמוד</div><div class="rate" id="br-fixedNI-val">–</div><div class="desc">ממוצע 5 בנקים</div></div>
+    <div class="rate-card ni"><div class="type">פריים משתנה</div><div class="rate" id="br-prime-val">–</div><div class="desc">ממוצע 5 בנקים</div></div>
+    <div class="rate-card cpi"><div class="type">צמוד מדד</div><div class="rate" id="br-fixedCI-val">–</div><div class="desc">ממוצע 5 בנקים</div></div>
+    <div class="rate-card"><div class="type">מקור נתונים</div><div class="rate" style="font-size:1rem" id="br-source-label">–</div><div class="desc" id="br-source-period">–</div></div>
   </div>
+
+  <!-- Per-bank table -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">ריביות לפי בנק</h3>
+      <span id="br-table-period" style="font-size:12px;color:#8b9bb8"></span>
+    </div>
+    <div id="br-table-wrap" style="overflow-x:auto">
+      <div style="color:#8b9bb8;text-align:center;padding:20px">טוען נתונים...</div>
+    </div>
+  </div>
+
+  <!-- Premium table + trend chart -->
   <div class="two-col">
     <div class="card">
       <h3>מגמת ריביות בנקים – שנה אחרונה</h3>
       <div class="ch"><canvas id="ch-bank-trend"></canvas></div>
     </div>
     <div class="card">
-      <h3>פרמיה מעל ריבית BOI (4.0%)</h3>
-      <table>
-        <tr><th>מסלול</th><th>ריבית</th><th>פרמיה</th></tr>
-        <tr><td>שקלי קבוע עד 5Y</td><td>4.73%</td><td><b>+0.23%</b></td></tr>
-        <tr><td>שקלי קבוע 5–15Y</td><td>4.74%</td><td><b>+0.24%</b></td></tr>
-        <tr><td>פריים משתנה</td><td>5.64%</td><td><b>+1.14%</b></td></tr>
-        <tr><td>צמוד קבוע</td><td>3.25%</td><td><span class="cheap">–1.25%</span> + מדד</td></tr>
-        <tr><td>צמוד משתנה</td><td>3.45%</td><td><span class="cheap">–1.05%</span> + מדד</td></tr>
-      </table>
-      <p style="margin-top:10px;font-size:.76rem;color:#999">מקור: BOI BIR_MRTG_99 | פבר׳ 2026</p>
+      <h3>פרמיה מעל ריבית BOI</h3>
+      <div id="br-premium-table">
+        <div style="color:#8b9bb8;text-align:center;padding:20px">טוען...</div>
+      </div>
+      <p style="margin-top:10px;font-size:.76rem;color:#999" id="br-footer-src"></p>
     </div>
   </div>
 </div>
@@ -683,17 +690,191 @@ function initMortgage() {
 }
 
 // ====================================================
-// BANK
+// BANK RATES — live from /api/bank-rates
 // ====================================================
+let bankRatesData = null;
+
+async function loadBankRates() {
+  try {
+    const r = await fetch('/api/bank-rates');
+    const j = await r.json();
+    bankRatesData = j.data;
+    renderBankRates();
+  } catch(e) {
+    console.error('[bank-rates]', e);
+    document.getElementById('br-table-wrap').innerHTML =
+      '<div style="color:#c0392b;text-align:center;padding:20px">שגיאה בטעינת נתוני ריביות</div>';
+  }
+}
+
+function renderBankRates() {
+  const d = bankRatesData;
+  if (!d) return;
+
+  // ── Source label ──
+  const sourceLabel = d.source === 'xls' ? '📊 BOI TamInt010.xls' : '📡 BOI SDMX BIR';
+  const periodFmt = fmtPeriodHe(d.period || '');
+  document.getElementById('br-source-label').textContent = sourceLabel;
+  document.getElementById('br-source-period').textContent = periodFmt;
+  const bsp=document.getElementById('br-status-period'); if(bsp) bsp.textContent=periodFmt;
+  document.getElementById('br-avg-period').textContent = 'BOI ' + periodFmt;
+  document.getElementById('br-table-period').textContent = periodFmt;
+  document.getElementById('br-footer-src').textContent =
+    'מקור: ' + (d.source==='xls'?'BOI TamInt010.xls':'BOI SDMX BIR') + ' | ' + periodFmt;
+
+  // ── KPI cards ──
+  if (d.source === 'xls' && d.banks) {
+    // XLS gives us IRR per bank — compute average
+    const vals = Object.values(d.banks).filter(v => typeof v === 'number' && v > 0 && v < 20);
+    const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    if (avg) document.getElementById('br-avg-val').textContent = avg.toFixed(2) + '%';
+    document.getElementById('br-fixedNI-val').textContent = '–';
+    document.getElementById('br-prime-val').textContent = '–';
+    document.getElementById('br-fixedCI-val').textContent = '–';
+    renderBankTableXLS(d);
+    renderPremiumTableXLS(d);
+  } else if (d.source === 'sdmx' && d.perBank) {
+    if (d.avg) document.getElementById('br-avg-val').textContent = d.avg.toFixed(2) + '%';
+    // Compute per-track averages
+    const tracks = ['prime', 'fixedNI', 'fixedCI'];
+    for (const t of tracks) {
+      const vals = Object.values(d.perBank)
+        .map(b => b[t]?.value).filter(v => v != null && v > 0);
+      const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+      const el = document.getElementById('br-' + t + '-val');
+      if (el && avg) el.textContent = avg.toFixed(2) + '%';
+    }
+    renderBankTableSDMX(d);
+    renderPremiumTableSDMX(d);
+  }
+  initBankChart();
+}
+
+function fmtPeriodHe(p) {
+  if (!p) return '–';
+  const months = ['','ינואר','פברואר','מרץ','אפריל','מאי','יוני',
+                  'יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const [yr, mo] = p.split('-');
+  if (yr && mo) return (months[+mo] || mo) + ' ' + yr;
+  return p;
+}
+
+function renderBankTableXLS(d) {
+  const banks = d.banks || {};
+  const sorted = Object.entries(banks).sort((a,b)=>a[1]-b[1]);
+  let rows = sorted.map(([name, irr]) => {
+    const bar = Math.min(100, Math.max(0, (irr - 4) / 4 * 100));
+    return `<tr>
+      <td style="font-weight:600;padding:8px 10px;direction:rtl">${name}</td>
+      <td style="padding:8px 10px;font-size:14px;font-weight:700;color:#5b9bd5">${irr.toFixed(2)}%</td>
+      <td style="padding:8px 4px;width:140px">
+        <div style="background:#1e2533;border-radius:4px;height:10px;overflow:hidden">
+          <div style="background:#5b9bd5;width:${bar}%;height:100%;border-radius:4px"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('br-table-wrap').innerHTML =
+    `<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px">
+      <thead><tr style="color:#8bb8d8;border-bottom:1px solid #2d3748">
+        <th style="padding:8px 10px;text-align:right">בנק</th>
+        <th style="padding:8px 10px;text-align:right">IRR</th>
+        <th style="padding:8px 4px"></th>
+      </tr></thead><tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderBankTableSDMX(d) {
+  const perBank = d.perBank || {};
+  const trackLabels = { prime:'פריים', fixedNI:'קבוע שקלי', fixedCI:'צמוד מדד' };
+  const tracks = ['fixedNI','prime','fixedCI'];
+  let header = '<tr style="color:#8bb8d8;border-bottom:1px solid #2d3748">' +
+    '<th style="padding:8px 10px;text-align:right">בנק</th>' +
+    tracks.map(t=>`<th style="padding:8px 10px;text-align:right">${trackLabels[t]}</th>`).join('') + '</tr>';
+  let rows = Object.entries(perBank).map(([name, data]) =>
+    '<tr>' +
+    `<td style="font-weight:600;padding:7px 10px;direction:rtl">${name}</td>` +
+    tracks.map(t => {
+      const v = data[t]?.value;
+      return `<td style="padding:7px 10px;color:#5b9bd5">${v!=null ? v.toFixed(2)+'%' : '—'}</td>`;
+    }).join('') + '</tr>'
+  ).join('');
+  document.getElementById('br-table-wrap').innerHTML =
+    `<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px">
+      <thead>${header}</thead><tbody>${rows}</tbody></table>
+    <p style="font-size:11px;color:#666;margin-top:8px;direction:rtl">
+      ⚠️ נתוני פר-בנק מ-SDMX עם פיגור של ~3 חודשים. ממוצע מערכת עדכני יותר.
+    </p>`;
+}
+
+function renderPremiumTableXLS(d) {
+  const boiRate = parseFloat(document.querySelector('[data-live="boi-rate"]')?.textContent) || 4.0;
+  const banks = d.banks || {};
+  const sorted = Object.entries(banks).sort((a,b)=>a[1]-b[1]);
+  let rows = sorted.map(([name, irr]) => {
+    const prem = +(irr - boiRate).toFixed(2);
+    const cls = prem > 0 ? 'color:#c0392b' : 'color:#27ae60';
+    const sign = prem > 0 ? '+' : '';
+    return `<tr><td style="padding:6px 8px;direction:rtl">${name}</td>
+      <td style="padding:6px 8px;text-align:right">${irr.toFixed(2)}%</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:700;${cls}">${sign}${prem.toFixed(2)}%</td></tr>`;
+  }).join('');
+  document.getElementById('br-premium-table').innerHTML =
+    `<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px">
+      <thead><tr style="color:#8bb8d8;border-bottom:1px solid #2d3748">
+        <th style="padding:6px 8px;text-align:right">בנק</th>
+        <th style="padding:6px 8px;text-align:right">IRR</th>
+        <th style="padding:6px 8px;text-align:right">פרמיה מעל BOI</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderPremiumTableSDMX(d) {
+  const boiRate = parseFloat(document.querySelector('[data-live="boi-rate"]')?.textContent) || 4.0;
+  const tracks = { fixedNI: 'קבוע שקלי', prime: 'פריים', fixedCI: 'צמוד מדד' };
+  // Average per track
+  let rows = '';
+  for (const [t, label] of Object.entries(tracks)) {
+    const vals = Object.values(d.perBank||{}).map(b=>b[t]?.value).filter(v=>v!=null&&v>0);
+    if (!vals.length) continue;
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const prem = +(avg - boiRate).toFixed(2);
+    const cls = prem > 0 ? 'color:#c0392b' : 'color:#27ae60';
+    const sign = prem > 0 ? '+' : '';
+    rows += `<tr><td style="padding:6px 8px;direction:rtl">${label}</td>
+      <td style="padding:6px 8px;text-align:right">${avg.toFixed(2)}%</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:700;${cls}">${sign}${prem.toFixed(2)}%</td></tr>`;
+  }
+  document.getElementById('br-premium-table').innerHTML =
+    `<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px">
+      <thead><tr style="color:#8bb8d8;border-bottom:1px solid #2d3748">
+        <th style="padding:6px 8px;text-align:right">מסלול</th>
+        <th style="padding:6px 8px;text-align:right">ממוצע</th>
+        <th style="padding:6px 8px;text-align:right">פרמיה</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function initBankChart() {
+  // Build trend from static D data (historical) + live avg if available
+  try {
+    const labels = D.bankLabels || [];
+    const niData = D.bankNI || [];
+    const cpiData = D.bankCPI || [];
+    mkChart('ch-bank-trend', {type:'line', data:{
+      labels,
+      datasets:[
+        {label:'שקלי ממוצע %', data:niData, borderColor:M, borderWidth:2.5, pointRadius:3, fill:false, tension:.3},
+        {label:'צמוד ממוצע %', data:cpiData, borderColor:G, borderWidth:2.5, pointRadius:3, fill:false, tension:.3}
+      ]},
+      options:baseOpts({scales:{
+        x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},
+        y:{ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}
+      }})
+    });
+  } catch(e) {}
+}
+
 function initBank() {
-  mkChart('ch-bank-trend',{type:'line',data:{
-    labels:D.bankLabels,
-    datasets:[
-      {label:'שקלי ממוצע %',data:D.bankNI,borderColor:M,borderWidth:2.5,pointRadius:3,fill:false,tension:.3},
-      {label:'צמוד ממוצע %',data:D.bankCPI,borderColor:G,borderWidth:2.5,pointRadius:3,fill:false,tension:.3}
-    ]},
-    options:baseOpts({scales:{x:{ticks:{font:{size:8},maxRotation:45},grid:{display:false}},y:{ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
-  });
+  loadBankRates();
 }
 
 // ====================================================

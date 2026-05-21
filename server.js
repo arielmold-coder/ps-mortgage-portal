@@ -1,4 +1,5 @@
 const http  = require('http');
+let XLSX; try { XLSX = require('xlsx'); } catch(e) { console.warn('[xlsx] not available, XLS parsing disabled'); }
 const https = require('https');
 const fs    = require('fs');
 const path  = require('path');
@@ -15,6 +16,31 @@ const BOI_CPI_URL  = `${BOI_BASE}/PRI/1.0/CP_PCHYTY?lastNObservations=3&format=c
 // ZCM = inflation expectations & zero-coupon yield curve (monthly)
 // Fetch last 2 months so we have current + prev month for comparison
 const USER_BONDS_FILE = path.join(DATA_DIR, 'user-bonds.json');
+
+const BANK_RATES_FILE = path.join(DATA_DIR, 'bank-rates.json');
+const BOI_XLS_URL = 'https://www.boi.org.il/boi_files/Pikuah/TamInt010.xls';
+
+// BIR SDMX series for per-bank mortgage rates
+// REP_ENTITY codes: 11=הפועלים 12=לאומי 17=מזרחי 18=בינלאומי 20=דיסקונט 31=מרכנתיל 10=ירושלים
+const BANK_META = {
+  '11': 'הפועלים',
+  '12': 'לאומי',
+  '17': 'מזרחי טפחות',
+  '18': 'בינלאומי',
+  '20': 'דיסקונט',
+  '31': 'מרכנתיל',
+  '10': 'ירושלים'
+};
+// Series suffix → track description
+// _2155 = prime-linked (פריים), _4122 = fixed nominal Q1, _2151 = CPI-linked
+const BIR_TRACKS = {
+  prime:    { suffix: '2155', label: 'משתנה – פריים',      type: 'NI' },
+  fixedNI:  { suffix: '4122', label: 'קבוע לא צמוד',      type: 'NI' },
+  fixedCI:  { suffix: '2151', label: 'צמוד מדד',           type: 'CI' }
+};
+// Aggregate series
+const BIR_AVG_SERIES = 'BNK_99010_LR_BIR_1893'; // all-banks avg mortgage rate
+
 
 const BOI_ZCM_URL  = `${BOI_BASE}/ZCM/1.0?lastNObservations=2&format=csv`;
 
@@ -43,6 +69,7 @@ const ZCM_SERIES = {
 let cache = {
   boiRate: null, prime: null, cpi: null,
   yields: { shachar:{}, galil:{} },
+  bankRates: null,
   lastUpdate: null
 };
 let history = {}; // { 'YYYY-MM': { boiRate, cpi, yields:{shachar:{},galil:{}} } }
@@ -57,6 +84,7 @@ function loadFromFiles() {
     if (fs.existsSync(CACHE_FILE)) cache = { ...cache, ...JSON.parse(fs.readFileSync(CACHE_FILE,'utf8')) };
     if (fs.existsSync(HIST_FILE))  history = JSON.parse(fs.readFileSync(HIST_FILE,'utf8'));
     if (fs.existsSync(USER_BONDS_FILE)) userBonds = JSON.parse(fs.readFileSync(USER_BONDS_FILE,'utf8'));
+    if (cache.bankRates) console.log('[init] bankRates loaded, period:', cache.bankRates.period);
     console.log('[init] cache loaded, lastUpdate:', cache.lastUpdate, '| history months:', Object.keys(history).length);
   } catch(e) { console.error('[init] load error:', e.message); }
 }
@@ -201,15 +229,205 @@ function getPrevMonthSnapshot() {
   return { month: prev, data: history[prev] };
 }
 
+
+// ── bank rates: download XLS from BOI ────────────────────
+function httpsGetBinary(rawUrl) {
+  return new Promise((resolve, reject) => {
+    const doRequest = (u, depth=0) => {
+      const mod = u.startsWith('https') ? https : require('http');
+      mod.get(u, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ps-mortgage-portal/2.0)',
+          'Accept': 'application/vnd.ms-excel,*/*'
+        }
+      }, r => {
+        if ((r.statusCode === 301 || r.statusCode === 302) && r.headers.location && depth < 3) {
+          return doRequest(r.headers.location, depth+1);
+        }
+        const chunks = [];
+        r.on('data', c => chunks.push(c));
+        r.on('end', () => resolve({ status: r.statusCode, buffer: Buffer.concat(chunks) }));
+      }).on('error', reject);
+    };
+    doRequest(rawUrl);
+  });
+}
+
+async function fetchBankRatesXLS() {
+  if (!XLSX) { console.warn('[bank-rates] xlsx not available'); return null; }
+  try {
+    console.log('[bank-rates] Downloading TamInt010.xls...');
+    const { status, buffer } = await httpsGetBinary(BOI_XLS_URL);
+    if (status !== 200) { console.warn('[bank-rates] XLS HTTP', status); return null; }
+    console.log('[bank-rates] XLS downloaded,', buffer.length, 'bytes');
+
+    const wb = XLSX.read(buffer, { type: 'buffer' });
+    console.log('[bank-rates] Sheets:', wb.SheetNames);
+
+    // Try each sheet — look for IRR data (ריבית כוללת חזויה)
+    // Expected: rows = banks, columns = months, values ~4-8%
+    let bestResult = null;
+
+    for (const sheetName of wb.SheetNames) {
+      const ws = wb.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      if (!data || data.length < 3) continue;
+
+      // Find latest date column (look for date-like header in row 0 or 1)
+      let headerRow = -1, dateCol = -1, latestPeriod = null;
+      for (let ri = 0; ri < Math.min(5, data.length); ri++) {
+        for (let ci = 0; ci < (data[ri]||[]).length; ci++) {
+          const cell = data[ri][ci];
+          if (cell && typeof cell === 'string' && /^\d{4}/.test(cell.trim())) {
+            // Found a date-like header
+            // Find the RIGHTMOST (most recent) date in this row
+            for (let ci2 = (data[ri].length-1); ci2 >= 0; ci2--) {
+              const c2 = data[ri][ci2];
+              if (c2 && typeof c2 === 'string' && /^\d{4}/.test(c2.trim())) {
+                headerRow = ri; dateCol = ci2; latestPeriod = c2.trim();
+                break;
+              } else if (c2 && typeof c2 === 'number') {
+                // Excel serial date
+                const d = XLSX.SSF.parse_date_code(c2);
+                if (d && d.y > 2020) {
+                  headerRow = ri; dateCol = ci2;
+                  latestPeriod = `${d.y}-${String(d.m).padStart(2,'0')}`;
+                  break;
+                }
+              }
+            }
+            if (headerRow >= 0) break;
+          }
+        }
+        if (headerRow >= 0) break;
+      }
+      if (headerRow < 0 || dateCol < 0) continue;
+
+      // Find bank rows: look for cells matching known bank name substrings
+      const BANK_NAMES_HE = {
+        'מזרחי': 'מזרחי טפחות', 'מזרחי-': 'מזרחי טפחות',
+        'לאומי': 'לאומי', 'הפועלים': 'הפועלים', 'פועלים': 'הפועלים',
+        'דיסקונט': 'דיסקונט', 'בינלאומי': 'בינלאומי',
+        'מרכנתיל': 'מרכנתיל', 'ירושלים': 'ירושלים',
+        'ממוצע': 'ממוצע מערכת', 'מערכת': 'ממוצע מערכת', 'כלל': 'ממוצע מערכת'
+      };
+
+      const banks = {};
+      for (let ri = headerRow+1; ri < data.length; ri++) {
+        const row = data[ri];
+        if (!row) continue;
+        // First non-empty cell in row = bank name label
+        let label = null;
+        for (let ci = 0; ci < Math.min(4, row.length); ci++) {
+          if (row[ci] && typeof row[ci] === 'string' && row[ci].trim().length > 1) {
+            label = row[ci].trim();
+            break;
+          }
+        }
+        if (!label) continue;
+        // Match label to known bank
+        let bankName = null;
+        for (const [key, name] of Object.entries(BANK_NAMES_HE)) {
+          if (label.includes(key)) { bankName = name; break; }
+        }
+        if (!bankName) continue;
+        // Get value at dateCol
+        const val = row[dateCol];
+        if (val == null || isNaN(parseFloat(val))) continue;
+        const numVal = parseFloat(val);
+        if (numVal < 1 || numVal > 20) continue; // sanity: 1-20%
+        banks[bankName] = +numVal.toFixed(4);
+      }
+
+      if (Object.keys(banks).length >= 3) {
+        console.log('[bank-rates] XLS parsed sheet:', sheetName, '| period:', latestPeriod, '| banks:', Object.keys(banks).join(', '));
+        if (!bestResult || Object.keys(banks).length > Object.keys(bestResult.banks).length) {
+          bestResult = { period: latestPeriod, banks, source: 'xls', sheet: sheetName };
+        }
+      }
+    }
+
+    if (bestResult) return bestResult;
+    console.warn('[bank-rates] XLS: no usable sheet found');
+    return null;
+  } catch(e) {
+    console.error('[bank-rates] XLS error:', e.message);
+    return null;
+  }
+}
+
+// SDMX BIR fallback — per track, per bank
+async function fetchBankRatesSDMX() {
+  try {
+    console.log('[bank-rates] Fetching SDMX BIR...');
+    // Fetch all BIR with 1 obs
+    const {status, body} = await httpsGet(
+      `${BOI_BASE}/BIR/1.0?lastNObservations=2&format=csv`
+    );
+    if (status !== 200) { console.warn('[BIR] HTTP', status); return null; }
+    const rows = parseBOIcsv(body).filter(r => r.OBS_VALUE && r.SERIES_CODE);
+
+    // Index by series code → last value
+    const byCode = {};
+    for (const row of rows) {
+      const code = row.SERIES_CODE;
+      if (!byCode[code] || row.TIME_PERIOD > byCode[code].period) {
+        byCode[code] = { value: parseFloat(row.OBS_VALUE), period: row.TIME_PERIOD };
+      }
+    }
+
+    // Aggregate
+    const avgEntry = byCode[BIR_AVG_SERIES];
+    const period = avgEntry?.period || 'n/a';
+
+    // Per bank per track
+    const banks = {};
+    for (const [bankId, bankName] of Object.entries(BANK_META)) {
+      const padded = bankId.padStart(2,'0');
+      const entry = {};
+      for (const [track, meta] of Object.entries(BIR_TRACKS)) {
+        const code = `BNK_${padded}001_LR_BIR_${meta.suffix}`;
+        const d = byCode[code];
+        if (d) entry[track] = { value: +d.value.toFixed(4), period: d.period };
+      }
+      if (Object.keys(entry).length) banks[bankName] = entry;
+    }
+
+    console.log('[bank-rates] SDMX BIR fetched, period:', period, '| banks:', Object.keys(banks).join(', '));
+    return {
+      period,
+      avg: avgEntry ? +avgEntry.value.toFixed(4) : null,
+      perBank: banks,
+      source: 'sdmx'
+    };
+  } catch(e) {
+    console.error('[bank-rates] SDMX error:', e.message);
+    return null;
+  }
+}
+
+async function fetchBankRates() {
+  // Try XLS first (most current), fall back to SDMX
+  const xls = await fetchBankRatesXLS();
+  if (xls) {
+    return { ...xls, fallback: false };
+  }
+  console.log('[bank-rates] XLS failed, trying SDMX fallback...');
+  const sdmx = await fetchBankRatesSDMX();
+  if (sdmx) return { ...sdmx, fallback: true };
+  return null;
+}
+
 // ── full refresh ──────────────────────────────────────────
 async function refreshAllData() {
   console.log('[refresh] Starting full data refresh...');
-  const [rate, cpi, zcmYields] = await Promise.all([ fetchBOIRate(), fetchCPI(), fetchAllYields() ]);
+  const [rate, cpi, zcmYields, bankRates] = await Promise.all([ fetchBOIRate(), fetchCPI(), fetchAllYields(), fetchBankRates() ]);
   if (rate!==null) { cache.boiRate=rate; cache.prime=+(rate+1.5).toFixed(2); }
   if (cpi) cache.cpi = cpi;
   // Yields: prefer user-uploaded data; fall back to ZCM
   const yields = yieldsFromUserBonds() || zcmYields;
   if (yields) cache.yields = yields;
+  if (bankRates) { cache.bankRates = bankRates; }
   cache.lastUpdate = new Date().toISOString();
   saveSnapshot();
   saveToFiles();
@@ -307,6 +525,9 @@ http.createServer((req,res)=>{
     // Restore ZCM yields
     fetchAllYields().then(y=>{ if(y){cache.yields=y;cache.lastUpdate=new Date().toISOString();} });
     sendJSON(res, { ok:true, message:'user bonds cleared; reverting to BOI ZCM' });
+
+  } else if (pathname==='/api/bank-rates') {
+    sendJSON(res, { data: cache.bankRates, lastUpdate: cache.lastUpdate });
 
   } else {
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
