@@ -881,7 +881,16 @@ async function loadLiveData(){
     const d=await r.json();
     if(d.boiRate!=null){['boi-rate-val','k-boi'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=d.boiRate.toFixed(2)+'%';});}
     if(d.prime!=null){['prime-val','k-prime'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=d.prime.toFixed(2)+'%';});}
-    if(d.cpi&&d.cpi.yoy!=null){document.querySelectorAll('[data-live="cpi-yoy"]').forEach(el=>{el.textContent=d.cpi.yoy.toFixed(2)+'%';});}
+    if(d.cpi&&d.cpi.yoy!=null){
+      const cpiVal=d.cpi.yoy.toFixed(2)+'%';
+      const _months=['','ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+      const [_yr,_mo]=(d.cpi.period||'').split('-');
+      const cpiPeriod=(_months[+_mo]||d.cpi.period)+' '+_yr;
+      document.querySelectorAll('[data-live="cpi-yoy"]').forEach(el=>el.textContent=cpiVal);
+      ['cpi-kpi-val','cpi-tab-val','cpi-ticker-val','cpi-advisor-val'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=cpiVal;});
+      ['cpi-kpi-period','cpi-tab-period','cpi-ticker-period'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=cpiPeriod;});
+      if(d.cpi.period&&typeof D!=='undefined'&&D.cpiYoy){D.cpiYoy[d.cpi.period]=d.cpi.yoy;}
+    }
     buildYieldDiffTable(d);
   }catch(e){console.warn('loadLiveData:',e);}
 }
