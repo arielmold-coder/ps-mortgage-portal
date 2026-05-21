@@ -956,7 +956,11 @@ async function loadCurrentBonds(){
   }catch(e){}
 }
 
-window.addEventListener('DOMContentLoaded',()=>{setTimeout(loadLiveData,300);setTimeout(loadCurrentBonds,500);});
+// Scripts at bottom of <body> — DOM is already parsed; call directly
+setTimeout(loadLiveData, 500);      // 500ms: after tab init + chart render
+setTimeout(loadCurrentBonds, 700);
+// Also re-run after full page load in case charts overwrite values
+window.addEventListener('load', ()=>{ setTimeout(loadLiveData, 800); });
 </script>
 </body>
 </html>
