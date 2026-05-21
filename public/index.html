@@ -781,7 +781,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 <!-- LIVE DATA + YIELD DIFF -->
 <script>
-const MATS=['1Y','3Y','5Y','10Y','30Y'];
+const MATS=['1Y','3Y','5Y','10Y','20Y'];
 function fmtDiff(curr,prev){
   if(curr==null||prev==null)return'<span style="color:#888">—</span>';
   const d=+(curr-prev).toFixed(3);
@@ -793,36 +793,37 @@ function fmtDiff(curr,prev){
 function buildYieldDiffTable(d){
   const container=document.getElementById('yield-diff-container');
   if(!container)return;
-  const cur=d.yields||{};const wk=d.weekAgo&&d.weekAgo.yields?d.weekAgo.yields:null;
+  const cur=d.yields||{};
+  // prevMonth: previous month snapshot for comparison
+  const prev=d.prevMonth&&d.prevMonth.yields?d.prevMonth.yields:null;
   let rows='';
   for(const mat of MATS){
-    const sh=cur.shachar&&cur.shachar[mat]?cur.shachar[mat].value:null;
-    const ga=cur.galil&&cur.galil[mat]?cur.galil[mat].value:null;
-    const shW=wk&&wk.shachar?wk.shachar[mat]:null;
-    const gaW=wk&&wk.galil?wk.galil[mat]:null;
+    const sh=cur.shachar&&cur.shachar[mat]!=null?cur.shachar[mat].value:null;
+    const ga=cur.galil&&cur.galil[mat]!=null?cur.galil[mat].value:null;
+    const shP=prev&&prev.shachar?prev.shachar[mat]:null;
+    const gaP=prev&&prev.galil?prev.galil[mat]:null;
     rows+='<tr><td style="font-weight:600;padding:5px 10px">'+mat+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+(sh!=null?sh.toFixed(2)+'%':'—')+'</td>'
-      +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(sh,shW)+'</td>'
+      +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(sh,shP)+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+(ga!=null?ga.toFixed(2)+'%':'—')+'</td>'
-      +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(ga,gaW)+'</td></tr>';
+      +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(ga,gaP)+'</td></tr>';
   }
-  const wkDate=d.weekAgoDate?('vs '+d.weekAgoDate):'שינוי שבועי';
-  const noData=!d.workingSeries||Object.keys(d.workingSeries).length===0;
+  const hasData=sh!=null||rows.includes('%');
+  const prevLabel=d.prevMonthKey?('vs '+d.prevMonthKey):'שינוי חודשי';
   const updStr=d.lastUpdate?new Date(d.lastUpdate).toLocaleString('he-IL'):'—';
+  const cpiStr=d.cpi&&d.cpi.yoy!=null?('  |  אינפלציה: '+d.cpi.yoy.toFixed(2)+'% ('+d.cpi.period+')'):'';
   container.innerHTML='<div style="background:#1e2533;border-radius:10px;padding:16px;margin:12px 0;direction:rtl">'
     +'<div style="color:#8bb8d8;font-size:13px;margin-bottom:10px;font-weight:600">'
-    +(noData?'⚠ נתוני תשואות BOI לא זמינים':'📊 תשואות אג"ח ממשלתי')
-    +' — '+wkDate+'</div>'
-    +(noData?'<div style="color:#8bb8d8;font-size:12px">נתוני תשואות יטענו לאחר 7 ימי איסוף</div>'
-    :'<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px"><thead>'
+    +'📊 תשואות אג"ח ממשלתי — '+prevLabel+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;color:#e4e8f0;font-size:13px"><thead>'
     +'<tr style="color:#8bb8d8;border-bottom:1px solid #2d3748">'
     +'<th style="padding:5px 10px;text-align:right">מח"מ</th>'
     +'<th style="padding:5px 10px;text-align:right">שחר %</th>'
-    +'<th style="padding:5px 10px;text-align:right">Δ שבוע</th>'
+    +'<th style="padding:5px 10px;text-align:right">Δ חודש</th>'
     +'<th style="padding:5px 10px;text-align:right">גליל %</th>'
-    +'<th style="padding:5px 10px;text-align:right">Δ שבוע</th>'
-    +'</tr></thead><tbody>'+rows+'</tbody></table>')
-    +'<div style="color:#556;font-size:11px;margin-top:8px;text-align:left">עודכן: '+updStr+'</div>'
+    +'<th style="padding:5px 10px;text-align:right">Δ חודש</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="color:#666;font-size:10px;margin-top:8px;text-align:left">עודכן: '+updStr+cpiStr+'</div>'
     +'</div>';
 }
 async function loadLiveData(){
