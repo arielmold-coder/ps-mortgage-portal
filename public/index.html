@@ -101,7 +101,6 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('dashboard',this)">📊 לוח ראשי</button>
   
-<div id="yield-diff-container" style="display:block;padding:0 8px;margin:0 8px"></div>
 <button class="tab-btn" onclick="showTab('curves',this)">📈 עקומי ריבית</button>
   <button class="tab-btn" onclick="showTab('makam',this)">⚡ מקמ ומדיניות</button>
   <button class="tab-btn" onclick="showTab('mortgage',this)">🏦 מחשבון משכנתא</button>
@@ -307,7 +306,7 @@
 </div>
 
 <!-- CPI -->
-<div id="tab-bonds-upload" class="tab-pane" style="display:none">
+<div id="tab-bonds-upload" class="tab-pane">
   <div style="direction:rtl;padding:16px">
     <h2 style="color:#8bb8d8;margin-bottom:4px">📤 העלאת נתוני אג"ח ממשלתי</h2>
     <p style="color:#8b9bb8;font-size:13px;margin-bottom:20px">הנתונים שתעלה יחליפו את נתוני BOI ZCM בטבלת התשואות. פורמט: CSV עם עמודות <code style="background:#1e2533;padding:2px 6px;border-radius:4px">type,maturity,yield_pct,date</code></p>
@@ -585,6 +584,7 @@ function initTab(name) {
   else if (name==='cpi') initCPI();
   else if (name==='housing') initHousing();
   else if (name==='bonds') initBonds();
+  else if (name==='bonds-upload') { if(typeof loadCurrentBonds==='function') loadCurrentBonds(); }
 }
 
 // ====================================================
