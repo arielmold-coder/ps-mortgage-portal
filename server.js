@@ -14,6 +14,8 @@ const BOI_RATE_URL = `${BOI_BASE}/BR/1.0/MNT_RIB_BOI_D?lastNObservations=1&forma
 const BOI_CPI_URL  = `${BOI_BASE}/PRI/1.0/CP_PCHYTY?lastNObservations=3&format=csv`;
 // ZCM = inflation expectations & zero-coupon yield curve (monthly)
 // Fetch last 2 months so we have current + prev month for comparison
+const USER_BONDS_FILE = path.join(DATA_DIR, 'user-bonds.json');
+
 const BOI_ZCM_URL  = `${BOI_BASE}/ZCM/1.0?lastNObservations=2&format=csv`;
 
 // Available maturities (30Y not published; 20Y is the max)
@@ -44,6 +46,7 @@ let cache = {
   lastUpdate: null
 };
 let history = {}; // { 'YYYY-MM': { boiRate, cpi, yields:{shachar:{},galil:{}} } }
+let userBonds = null; // uploaded bond data { bonds:[], filename, uploadedAt }
 
 // ── helpers ──────────────────────────────────────────────
 function ensureDataDir() {
@@ -53,6 +56,7 @@ function loadFromFiles() {
   try {
     if (fs.existsSync(CACHE_FILE)) cache = { ...cache, ...JSON.parse(fs.readFileSync(CACHE_FILE,'utf8')) };
     if (fs.existsSync(HIST_FILE))  history = JSON.parse(fs.readFileSync(HIST_FILE,'utf8'));
+    if (fs.existsSync(USER_BONDS_FILE)) userBonds = JSON.parse(fs.readFileSync(USER_BONDS_FILE,'utf8'));
     console.log('[init] cache loaded, lastUpdate:', cache.lastUpdate, '| history months:', Object.keys(history).length);
   } catch(e) { console.error('[init] load error:', e.message); }
 }
@@ -61,6 +65,7 @@ function saveToFiles() {
     ensureDataDir();
     fs.writeFileSync(CACHE_FILE, JSON.stringify(cache,null,2));
     fs.writeFileSync(HIST_FILE,  JSON.stringify(history,null,2));
+    if (userBonds) fs.writeFileSync(USER_BONDS_FILE, JSON.stringify(userBonds,null,2));
   } catch(e) { console.error('[save] error:', e.message); }
 }
 function httpsGet(rawUrl) {
@@ -81,6 +86,26 @@ function parseBOIcsv(csv) {
     h.forEach((k,i) => obj[k.trim()] = (p[i]||'').trim());
     return obj;
   });
+}
+
+// ── user-uploaded bond yields → same shape as fetchAllYields output ─────
+function yieldsFromUserBonds() {
+  if (!userBonds || !userBonds.bonds || !userBonds.bonds.length) return null;
+  const yields = { shachar:{}, galil:{} };
+  for (const b of userBonds.bonds) {
+    const type = b.type; // 'shachar' | 'galil'
+    const mat  = b.maturity;
+    if (!yields[type]) continue;
+    // Build same shape as ZCM: value + period, no prevValue (user upload has no prev)
+    yields[type][mat] = {
+      value:  +parseFloat(b.yield_pct).toFixed(4),
+      period: b.date || userBonds.uploadedAt?.substring(0,10) || 'user',
+      prevValue:  cache.yields?.[type]?.[mat]?.value ?? null,   // keep last known as "prev"
+      prevPeriod: cache.yields?.[type]?.[mat]?.period ?? null,
+      source: 'user'
+    };
+  }
+  return yields;
 }
 
 // ── data fetchers ─────────────────────────────────────────
@@ -179,9 +204,11 @@ function getPrevMonthSnapshot() {
 // ── full refresh ──────────────────────────────────────────
 async function refreshAllData() {
   console.log('[refresh] Starting full data refresh...');
-  const [rate, cpi, yields] = await Promise.all([ fetchBOIRate(), fetchCPI(), fetchAllYields() ]);
+  const [rate, cpi, zcmYields] = await Promise.all([ fetchBOIRate(), fetchCPI(), fetchAllYields() ]);
   if (rate!==null) { cache.boiRate=rate; cache.prime=+(rate+1.5).toFixed(2); }
-  if (cpi)    cache.cpi    = cpi;
+  if (cpi) cache.cpi = cpi;
+  // Yields: prefer user-uploaded data; fall back to ZCM
+  const yields = yieldsFromUserBonds() || zcmYields;
   if (yields) cache.yields = yields;
   cache.lastUpdate = new Date().toISOString();
   saveSnapshot();
@@ -243,7 +270,43 @@ http.createServer((req,res)=>{
       .catch(e=>sendJSON(res,{ok:false,error:e.message},500));
 
   } else if (pathname==='/api/debug') {
-    sendJSON(res,{ cache, historyMonths:Object.keys(history), maturities: MATURITIES });
+    sendJSON(res,{ cache, historyMonths:Object.keys(history), maturities: MATURITIES, hasUserBonds: !!userBonds });
+
+  } else if (pathname==='/api/user-bonds') {
+    sendJSON(res, { data: userBonds, source: userBonds ? 'user' : 'boi-zcm' });
+
+  } else if (pathname==='/api/upload-bonds' && req.method==='POST') {
+    let body='';
+    req.on('data',c=>body+=c);
+    req.on('end',()=>{
+      try {
+        const payload = JSON.parse(body);
+        if (!payload.bonds || !Array.isArray(payload.bonds)) {
+          return sendJSON(res,{ok:false,error:'invalid payload — need bonds array'},400);
+        }
+        // Validate rows
+        const valid = payload.bonds.filter(b=>
+          b.type && (b.type==='shachar'||b.type==='galil') &&
+          b.maturity && !isNaN(parseFloat(b.yield_pct))
+        );
+        if (!valid.length) return sendJSON(res,{ok:false,error:'no valid rows'},400);
+        userBonds = { bonds: valid, filename: payload.filename||'upload.csv', uploadedAt: payload.uploadedAt||new Date().toISOString() };
+        // Immediately rebuild yields from user data
+        const uy = yieldsFromUserBonds();
+        if (uy) { cache.yields = uy; cache.lastUpdate = new Date().toISOString(); }
+        ensureDataDir();
+        fs.writeFileSync(USER_BONDS_FILE, JSON.stringify(userBonds,null,2));
+        console.log('[user-bonds] Loaded', valid.length, 'entries from', userBonds.filename);
+        sendJSON(res, { ok:true, count: valid.length, data: userBonds });
+      } catch(e) { sendJSON(res,{ok:false,error:e.message},500); }
+    });
+
+  } else if (pathname==='/api/upload-bonds' && req.method==='DELETE') {
+    userBonds = null;
+    try { if(fs.existsSync(USER_BONDS_FILE)) fs.unlinkSync(USER_BONDS_FILE); } catch(e){}
+    // Restore ZCM yields
+    fetchAllYields().then(y=>{ if(y){cache.yields=y;cache.lastUpdate=new Date().toISOString();} });
+    sendJSON(res, { ok:true, message:'user bonds cleared; reverting to BOI ZCM' });
 
   } else {
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
