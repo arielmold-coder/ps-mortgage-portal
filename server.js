@@ -17,7 +17,7 @@ const BOI_CPI_URL  = `${BOI_BASE}/PRI/1.0/CP_PCHYTY?lastNObservations=3&format=c
 const BOI_ZCM_URL  = `${BOI_BASE}/ZCM/1.0?lastNObservations=2&format=csv`;
 
 // Available maturities (30Y not published; 20Y is the max)
-const MATURITIES = ['1Y','3Y','5Y','10Y','20Y'];
+const MATURITIES = ['1Y','3Y','5Y','10Y','15Y'];
 
 // Correct ZCM series codes (confirmed via API exploration)
 const ZCM_SERIES = {
@@ -26,14 +26,14 @@ const ZCM_SERIES = {
     '3Y':  'ZC_TSB_ZND_03Y_MA',
     '5Y':  'ZC_TSB_ZND_05Y_MA',
     '10Y': 'ZC_TSB_ZND_10Y_MA',
-    '20Y': 'ZC_TSB_ZND_20Y_MA'
+    '15Y': 'ZC_TSB_ZND_15Y_MA'
   },
   galil: {
     '1Y':  'ZC_TSB_ZRD_01Y_MA',
     '3Y':  'ZC_TSB_ZRD_03Y_MA',
     '5Y':  'ZC_TSB_ZRD_05Y_MA',
     '10Y': 'ZC_TSB_ZRD_10Y_MA',
-    '20Y': 'ZC_TSB_ZRD_20Y_MA'
+    '15Y': 'ZC_TSB_ZRD_15Y_MA'
   }
 };
 

@@ -781,7 +781,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 <!-- LIVE DATA + YIELD DIFF -->
 <script>
-const MATS=['1Y','3Y','5Y','10Y','20Y'];
+const MATS=['1Y','3Y','5Y','10Y','15Y'];
 function fmtDiff(curr,prev){
   if(curr==null||prev==null)return'<span style="color:#888">—</span>';
   const d=+(curr-prev).toFixed(3);
@@ -794,22 +794,24 @@ function buildYieldDiffTable(d){
   const container=document.getElementById('yield-diff-container');
   if(!container)return;
   const cur=d.yields||{};
-  // prevMonth: previous month snapshot for comparison
-  const prev=d.prevMonth&&d.prevMonth.yields?d.prevMonth.yields:null;
   let rows='';
+  let prevPeriod='';
   for(const mat of MATS){
-    const sh=cur.shachar&&cur.shachar[mat]!=null?cur.shachar[mat].value:null;
-    const ga=cur.galil&&cur.galil[mat]!=null?cur.galil[mat].value:null;
-    const shP=prev&&prev.shachar?prev.shachar[mat]:null;
-    const gaP=prev&&prev.galil?prev.galil[mat]:null;
+    const shObj=cur.shachar&&cur.shachar[mat]?cur.shachar[mat]:null;
+    const gaObj=cur.galil&&cur.galil[mat]?cur.galil[mat]:null;
+    const sh=shObj?shObj.value:null;
+    const ga=gaObj?gaObj.value:null;
+    // Use embedded prevValue from the API (ZCM returns 2 months; prevValue = last month)
+    const shP=shObj?shObj.prevValue:null;
+    const gaP=gaObj?gaObj.prevValue:null;
+    if(!prevPeriod&&shObj&&shObj.prevPeriod) prevPeriod=shObj.prevPeriod;
     rows+='<tr><td style="font-weight:600;padding:5px 10px">'+mat+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+(sh!=null?sh.toFixed(2)+'%':'—')+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(sh,shP)+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+(ga!=null?ga.toFixed(2)+'%':'—')+'</td>'
       +'<td style="padding:5px 10px;text-align:right">'+fmtDiff(ga,gaP)+'</td></tr>';
   }
-  const hasData=sh!=null||rows.includes('%');
-  const prevLabel=d.prevMonthKey?('vs '+d.prevMonthKey):'שינוי חודשי';
+  const prevLabel=prevPeriod?('vs '+prevPeriod):'שינוי חודשי';
   const updStr=d.lastUpdate?new Date(d.lastUpdate).toLocaleString('he-IL'):'—';
   const cpiStr=d.cpi&&d.cpi.yoy!=null?('  |  אינפלציה: '+d.cpi.yoy.toFixed(2)+'% ('+d.cpi.period+')'):'';
   container.innerHTML='<div style="background:#1e2533;border-radius:10px;padding:16px;margin:12px 0;direction:rtl">'
