@@ -103,15 +103,27 @@ function httpsGet(rawUrl) {
     }).on('error', reject);
   });
 }
-// Parse SDMX CSV → array of row objects
+// Parse SDMX CSV → array of row objects (handles quoted fields with commas)
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"' ) { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
 function parseBOIcsv(csv) {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
-  const h = lines[0].split(',');
+  const h = parseCsvLine(lines[0]);
   return lines.slice(1).map(l => {
-    const p = l.split(',');
+    const p = parseCsvLine(l);
     const obj = {};
-    h.forEach((k,i) => obj[k.trim()] = (p[i]||'').trim());
+    h.forEach((k,i) => obj[k] = (p[i]||'').trim());
     return obj;
   });
 }
