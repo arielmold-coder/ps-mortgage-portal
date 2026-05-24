@@ -267,6 +267,18 @@ function httpsGetBinary(rawUrl) {
 
 async function fetchBankRatesXLS() {
   if (!XLSX) { console.warn('[bank-rates] xlsx not available'); return null; }
+  // Hebrew month names for display
+  const HE_MONTHS = {
+    '01':'ינואר','02':'פברואר','03':'מרץ','04':'אפריל',
+    '05':'מאי','06':'יוני','07':'יולי','08':'אוגוסט',
+    '09':'ספטמבר','10':'אוקטובר','11':'נובמבר','12':'דצמבר'
+  };
+  function periodHe(iso) {
+    // "2026-04" -> "אפריל 2026"
+    const m = iso && iso.match(/^(\d{4})-(\d{2})$/);
+    return m ? `${HE_MONTHS[m[2]]||m[2]} ${m[1]}` : iso;
+  }
+
   try {
     console.log('[bank-rates] Downloading TamInt010.xls...');
     const { status, buffer } = await httpsGetBinary(BOI_XLS_URL);
@@ -276,90 +288,93 @@ async function fetchBankRatesXLS() {
     const wb = XLSX.read(buffer, { type: 'buffer' });
     console.log('[bank-rates] Sheets:', wb.SheetNames);
 
-    // Try each sheet — look for IRR data (ריבית כוללת חזויה)
-    // Expected: rows = banks, columns = months, values ~4-8%
-    let bestResult = null;
+    // TamInt010.xls structure (L01 sheet):
+    // Row 0: Excel serial date (file update date)
+    // Rows 1-8: Titles
+    // Row 9: Bank names at fixed columns: פועלים@1, לאומי@7, דיסקונט@13,
+    //         מזרחי@19, בינלאומי@25, מרכנתיל@31, ירושלים@37, סך מערכת@43
+    // Row 11: Track names (offsets from bank col):
+    //         +0=IRR(3IRR), +1=קבועה לא צמודה, +2=פריים, +3=משתנה לא צמודה, +4=משתנה צמוד, +5=קבועה צמוד
+    // Row 12+: Data rows — col 0 = "YYYY-MM" string, values at bank+track cols
+    //          Most recent period is row 12 (newest first)
+
+    const BANK_KEYS = {
+      'פועלים':'הפועלים', 'לאומי':'לאומי', 'דיסקונט':'דיסקונט',
+      'מזרחי':'מזרחי טפחות', 'בינלאומי':'בינלאומי',
+      'מרכנתיל':'מרכנתיל', 'ירושלים':'ירושלים',
+      'מערכת':'ממוצע מערכת', 'סך':'ממוצע מערכת', 'כלל':'ממוצע מערכת'
+    };
+    // Track offsets from bank base column
+    const TRACK_OFF = { irr: 0, fixedNI: 1, prime: 2, varNI: 3, varCI: 4, fixedCI: 5 };
 
     for (const sheetName of wb.SheetNames) {
       const ws = wb.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      if (!data || data.length < 3) continue;
+      if (!data || data.length < 13) continue;
 
-      // Find latest date column (look for date-like header in row 0 or 1)
-      let headerRow = -1, dateCol = -1, latestPeriod = null;
-      for (let ri = 0; ri < Math.min(5, data.length); ri++) {
-        for (let ci = 0; ci < (data[ri]||[]).length; ci++) {
-          const cell = data[ri][ci];
-          if (cell && typeof cell === 'string' && /^\d{4}/.test(cell.trim())) {
-            // Found a date-like header
-            // Find the RIGHTMOST (most recent) date in this row
-            for (let ci2 = (data[ri].length-1); ci2 >= 0; ci2--) {
-              const c2 = data[ri][ci2];
-              if (c2 && typeof c2 === 'string' && /^\d{4}/.test(c2.trim())) {
-                headerRow = ri; dateCol = ci2; latestPeriod = c2.trim();
-                break;
-              } else if (c2 && typeof c2 === 'number') {
-                // Excel serial date
-                const d = XLSX.SSF.parse_date_code(c2);
-                if (d && d.y > 2020) {
-                  headerRow = ri; dateCol = ci2;
-                  latestPeriod = `${d.y}-${String(d.m).padStart(2,'0')}`;
-                  break;
-                }
-              }
+      // 1. Find bank columns by scanning rows 5-15
+      const bankCols = {}; // bankCanonName -> base column index
+      for (let ri = 5; ri < Math.min(15, data.length); ri++) {
+        const row = data[ri] || [];
+        for (let ci = 0; ci < row.length; ci++) {
+          const cell = row[ci];
+          if (!cell || typeof cell !== 'string') continue;
+          for (const [key, name] of Object.entries(BANK_KEYS)) {
+            if (cell.includes(key) && !bankCols[name]) {
+              bankCols[name] = ci;
+              break;
             }
-            if (headerRow >= 0) break;
           }
         }
-        if (headerRow >= 0) break;
+        if (Object.keys(bankCols).length >= 5) break;
       }
-      if (headerRow < 0 || dateCol < 0) continue;
+      if (Object.keys(bankCols).length < 3) {
+        console.log('[bank-rates] Sheet', sheetName, '— not enough banks found, skipping');
+        continue;
+      }
 
-      // Find bank rows: look for cells matching known bank name substrings
-      const BANK_NAMES_HE = {
-        'מזרחי': 'מזרחי טפחות', 'מזרחי-': 'מזרחי טפחות',
-        'לאומי': 'לאומי', 'הפועלים': 'הפועלים', 'פועלים': 'הפועלים',
-        'דיסקונט': 'דיסקונט', 'בינלאומי': 'בינלאומי',
-        'מרכנתיל': 'מרכנתיל', 'ירושלים': 'ירושלים',
-        'ממוצע': 'ממוצע מערכת', 'מערכת': 'ממוצע מערכת', 'כלל': 'ממוצע מערכת'
-      };
-
-      const banks = {};
-      for (let ri = headerRow+1; ri < data.length; ri++) {
+      // 2. Find most recent data row — col 0 has "YYYY-MM" format
+      let latestPeriod = null, latestRow = null;
+      for (let ri = 10; ri < data.length; ri++) {
         const row = data[ri];
         if (!row) continue;
-        // First non-empty cell in row = bank name label
-        let label = null;
-        for (let ci = 0; ci < Math.min(4, row.length); ci++) {
-          if (row[ci] && typeof row[ci] === 'string' && row[ci].trim().length > 1) {
-            label = row[ci].trim();
-            break;
+        const cell = row[0];
+        if (cell && typeof cell === 'string' && /^\d{4}-\d{2}$/.test(cell.trim())) {
+          const period = cell.trim();
+          if (!latestPeriod || period > latestPeriod) {
+            latestPeriod = period;
+            latestRow = row;
           }
         }
-        if (!label) continue;
-        // Match label to known bank
-        let bankName = null;
-        for (const [key, name] of Object.entries(BANK_NAMES_HE)) {
-          if (label.includes(key)) { bankName = name; break; }
+      }
+      if (!latestPeriod || !latestRow) {
+        console.log('[bank-rates] Sheet', sheetName, '— no date rows found, skipping');
+        continue;
+      }
+
+      // 3. Extract IRR and track values per bank
+      const banks = {};
+      const tracks = {}; // bankName -> { irr, fixedNI, prime, varCI, fixedCI }
+      for (const [bankName, baseCol] of Object.entries(bankCols)) {
+        const irr = parseFloat(latestRow[baseCol + TRACK_OFF.irr]);
+        if (isNaN(irr) || irr < 1 || irr > 20) continue;
+        banks[bankName] = +irr.toFixed(4);
+        tracks[bankName] = {};
+        for (const [track, off] of Object.entries(TRACK_OFF)) {
+          const v = parseFloat(latestRow[baseCol + off]);
+          if (!isNaN(v) && v > 0 && v < 20) tracks[bankName][track] = +v.toFixed(4);
         }
-        if (!bankName) continue;
-        // Get value at dateCol
-        const val = row[dateCol];
-        if (val == null || isNaN(parseFloat(val))) continue;
-        const numVal = parseFloat(val);
-        if (numVal < 1 || numVal > 20) continue; // sanity: 1-20%
-        banks[bankName] = +numVal.toFixed(4);
       }
 
       if (Object.keys(banks).length >= 3) {
-        console.log('[bank-rates] XLS parsed sheet:', sheetName, '| period:', latestPeriod, '| banks:', Object.keys(banks).join(', '));
-        if (!bestResult || Object.keys(banks).length > Object.keys(bestResult.banks).length) {
-          bestResult = { period: latestPeriod, banks, source: 'xls', sheet: sheetName };
-        }
+        const displayPeriod = periodHe(latestPeriod);
+        console.log('[bank-rates] XLS parsed sheet:', sheetName,
+          '| period:', latestPeriod, '(', displayPeriod, ')',
+          '| banks:', Object.keys(banks).join(', '));
+        return { period: latestPeriod, periodHe: displayPeriod, banks, tracks, source: 'xls', sheet: sheetName };
       }
     }
 
-    if (bestResult) return bestResult;
     console.warn('[bank-rates] XLS: no usable sheet found');
     return null;
   } catch(e) {
@@ -367,6 +382,7 @@ async function fetchBankRatesXLS() {
     return null;
   }
 }
+
 
 // SDMX BIR fallback — per track, per bank
 async function fetchBankRatesSDMX() {

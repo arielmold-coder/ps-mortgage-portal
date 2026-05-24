@@ -713,7 +713,7 @@ function renderBankRates() {
 
   // ── Source label ──
   const sourceLabel = d.source === 'xls' ? '📊 BOI TamInt010.xls' : '📡 BOI SDMX BIR';
-  const periodFmt = fmtPeriodHe(d.period || '');
+  const periodFmt = d.periodHe || fmtPeriodHe(d.period || '');
   document.getElementById('br-source-label').textContent = sourceLabel;
   document.getElementById('br-source-period').textContent = periodFmt;
   const bsp=document.getElementById('br-status-period'); if(bsp) bsp.textContent=periodFmt;
@@ -724,13 +724,28 @@ function renderBankRates() {
 
   // ── KPI cards ──
   if (d.source === 'xls' && d.banks) {
-    // XLS gives us IRR per bank — compute average
-    const vals = Object.values(d.banks).filter(v => typeof v === 'number' && v > 0 && v < 20);
-    const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    // XLS gives us IRR + per-track values per bank
+    const irrVals = Object.values(d.banks).filter(v => typeof v === 'number' && v > 0 && v < 20);
+    const avg = irrVals.length ? (irrVals.reduce((a,b)=>a+b,0)/irrVals.length) : null;
     if (avg) document.getElementById('br-avg-val').textContent = avg.toFixed(2) + '%';
-    document.getElementById('br-fixedNI-val').textContent = '–';
-    document.getElementById('br-prime-val').textContent = '–';
-    document.getElementById('br-fixedCI-val').textContent = '–';
+    // Per-track averages from d.tracks (new structure)
+    if (d.tracks) {
+      const tAvg = (key) => {
+        const vs = Object.values(d.tracks).map(t=>t[key]).filter(v=>v!=null&&v>0&&v<20);
+        return vs.length ? vs.reduce((a,b)=>a+b,0)/vs.length : null;
+      };
+      const fni = tAvg('fixedNI'), pr = tAvg('prime'), fci = tAvg('fixedCI');
+      if (fni) document.getElementById('br-fixedNI-val').textContent = fni.toFixed(2) + '%';
+      else document.getElementById('br-fixedNI-val').textContent = '–';
+      if (pr)  document.getElementById('br-prime-val').textContent = pr.toFixed(2) + '%';
+      else document.getElementById('br-prime-val').textContent = '–';
+      if (fci) document.getElementById('br-fixedCI-val').textContent = fci.toFixed(2) + '%';
+      else document.getElementById('br-fixedCI-val').textContent = '–';
+    } else {
+      document.getElementById('br-fixedNI-val').textContent = '–';
+      document.getElementById('br-prime-val').textContent = '–';
+      document.getElementById('br-fixedCI-val').textContent = '–';
+    }
     renderBankTableXLS(d);
     renderPremiumTableXLS(d);
   } else if (d.source === 'sdmx' && d.perBank) {
