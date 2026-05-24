@@ -15,7 +15,8 @@ const BOI_RATE_URL = `${BOI_BASE}/BR/1.0/MNT_RIB_BOI_D?lastNObservations=1&forma
 const BOI_CPI_URL  = `${BOI_BASE}/PRI/1.0/CP_PCHYTY?lastNObservations=3&format=csv`;
 // ZCM = inflation expectations & zero-coupon yield curve (monthly)
 // Fetch last 2 months so we have current + prev month for comparison
-const USER_BONDS_FILE = path.join(DATA_DIR, 'user-bonds.json');
+const USER_BONDS_FILE    = path.join(DATA_DIR, 'user-bonds.json');
+const BONDS_HISTORY_FILE = path.join(DATA_DIR, 'bonds-history.json');
 
 const BANK_RATES_FILE = path.join(DATA_DIR, 'bank-rates.json');
 const BOI_XLS_URL = 'https://www.boi.org.il/boi_files/Pikuah/TamInt010.xls';
@@ -73,7 +74,8 @@ let cache = {
   lastUpdate: null
 };
 let history = {}; // { 'YYYY-MM': { boiRate, cpi, yields:{shachar:{},galil:{}} } }
-let userBonds = null; // uploaded bond data { bonds:[], filename, uploadedAt }
+let userBonds = null;      // uploaded bond data (new format: { govBonds, mktm, uploadedAt })
+let bondsHistory = [];     // last 10 uploads for change tracking
 
 // ── helpers ──────────────────────────────────────────────
 function ensureDataDir() {
@@ -129,23 +131,80 @@ function parseBOIcsv(csv) {
 }
 
 // ── user-uploaded bond yields → same shape as fetchAllYields output ─────
+// Gov bonds: indexing type "שקלי" → shachar, "מדד" or "צמוד" → galil
+// Duration (מח"מ ברוטו) maps to maturity bucket
 function yieldsFromUserBonds() {
-  if (!userBonds || !userBonds.bonds || !userBonds.bonds.length) return null;
+  if (!userBonds || !userBonds.govBonds || !userBonds.govBonds.length) return null;
   const yields = { shachar:{}, galil:{} };
-  for (const b of userBonds.bonds) {
-    const type = b.type; // 'shachar' | 'galil'
-    const mat  = b.maturity;
-    if (!yields[type]) continue;
-    // Build same shape as ZCM: value + period, no prevValue (user upload has no prev)
-    yields[type][mat] = {
-      value:  +parseFloat(b.yield_pct).toFixed(4),
-      period: b.date || userBonds.uploadedAt?.substring(0,10) || 'user',
-      prevValue:  cache.yields?.[type]?.[mat]?.value ?? null,   // keep last known as "prev"
-      prevPeriod: cache.yields?.[type]?.[mat]?.period ?? null,
-      source: 'user'
-    };
+  const dateStr = userBonds.uploadedAt?.substring(0,10) || 'user';
+
+  // Duration → standard maturity label
+  function durToLabel(dur) {
+    const d = parseFloat(dur);
+    if (isNaN(d)) return null;
+    if (d <= 0.6)  return '0.5Y';
+    if (d <= 1.3)  return '1Y';
+    if (d <= 2.3)  return '2Y';
+    if (d <= 3.5)  return '3Y';
+    if (d <= 5.5)  return '5Y';
+    if (d <= 7.5)  return '7Y';
+    if (d <= 11)   return '10Y';
+    if (d <= 17)   return '15Y';
+    return '20Y';
   }
-  return yields;
+
+  for (const b of userBonds.govBonds) {
+    const yld = parseFloat(b.yield_pct);
+    if (isNaN(yld) || yld < -5 || yld > 30) continue;
+    const label = durToLabel(b.duration);
+    if (!label) continue;
+
+    // Determine type from סוג הצמדה
+    const idx = (b.indexing || '').trim();
+    let type = null;
+    if (idx === 'שקלי' || idx === 'משתנה') type = 'shachar';
+    else if (idx === 'מדד' || idx.includes('צמוד')) type = 'galil';
+    if (!type) continue;
+
+    const existing = yields[type][label];
+    // Keep shortest duration per bucket (closest to benchmark)
+    if (!existing || Math.abs(parseFloat(b.duration) - parseFloat(label)) < 
+                     Math.abs((existing._dur||0) - parseFloat(label))) {
+      yields[type][label] = {
+        value:      +yld.toFixed(4),
+        period:     dateStr,
+        prevValue:  cache.yields?.[type]?.[label]?.value ?? null,
+        prevPeriod: cache.yields?.[type]?.[label]?.period ?? null,
+        source:     'user',
+        _dur:       parseFloat(b.duration),
+        name:       b.name
+      };
+    }
+  }
+  // Remove internal _dur field
+  for (const t of ['shachar','galil']) {
+    for (const k of Object.keys(yields[t])) { delete yields[t][k]._dur; }
+  }
+  const hasData = Object.values(yields.shachar).length > 0 || Object.values(yields.galil).length > 0;
+  return hasData ? yields : null;
+}
+
+// ── bonds history: save upload with timestamp ─────────────────────────────
+function saveBondsHistory(entry) {
+  bondsHistory.unshift({ ...entry, timestamp: new Date().toISOString() });
+  bondsHistory = bondsHistory.slice(0, 10); // keep last 10
+  try {
+    ensureDataDir();
+    fs.writeFileSync(BONDS_HISTORY_FILE, JSON.stringify(bondsHistory, null, 2));
+  } catch(e) { console.warn('[bonds-history] save failed:', e.message); }
+}
+
+function loadBondsHistory() {
+  try {
+    if (fs.existsSync(BONDS_HISTORY_FILE)) {
+      bondsHistory = JSON.parse(fs.readFileSync(BONDS_HISTORY_FILE, 'utf8'));
+    }
+  } catch(e) { bondsHistory = []; }
 }
 
 // ── data fetchers ─────────────────────────────────────────
@@ -469,7 +528,8 @@ function scheduleRefresh() {
   if (next<=now) next.setDate(next.getDate()+1);
   const ms = next-now;
   console.log(`[scheduler] Next refresh at 15:00 UTC (~${Math.round(ms/60000)}min)`);
-  setTimeout(async()=>{ await refreshAllData(); scheduleRefresh(); }, ms);
+  setTimeout(async()=>{ await refreshAllData(); loadBondsHistory();
+scheduleRefresh(); }, ms);
 }
 
 // ── HTTP server ───────────────────────────────────────────
@@ -527,32 +587,71 @@ http.createServer((req,res)=>{
     req.on('end',()=>{
       try {
         const payload = JSON.parse(body);
-        if (!payload.bonds || !Array.isArray(payload.bonds)) {
-          return sendJSON(res,{ok:false,error:'invalid payload — need bonds array'},400);
+        // New format: { govBonds:[], mktm:[], uploadedAt, label }
+        // Also accept legacy format: { bonds:[], ... }
+        const now = new Date().toISOString();
+        let newBonds;
+
+        if (payload.govBonds || payload.mktm) {
+          // New format
+          const govBonds = (payload.govBonds || []).filter(b =>
+            b.name && !isNaN(parseFloat(b.yield_pct))
+          );
+          const mktm = (payload.mktm || []).filter(b =>
+            b.name && !isNaN(parseFloat(b.yield_pct))
+          );
+          if (!govBonds.length && !mktm.length) {
+            return sendJSON(res,{ok:false,error:'no valid rows in govBonds or mktm'},400);
+          }
+          // Merge with existing if partial upload
+          newBonds = {
+            govBonds: govBonds.length ? govBonds : (userBonds?.govBonds || []),
+            mktm:     mktm.length     ? mktm     : (userBonds?.mktm || []),
+            uploadedAt: payload.uploadedAt || now,
+            label: payload.label || now.substring(0,10)
+          };
+        } else if (payload.bonds) {
+          // Legacy CSV format — convert to new structure
+          const govBonds = payload.bonds.map(b => ({
+            name: b.maturity || 'bond',
+            yield_pct: b.yield_pct,
+            duration: b.maturity?.replace(/Y$/,'') || 0,
+            indexing: b.type === 'galil' ? 'מדד' : 'שקלי',
+            maturity: null
+          }));
+          newBonds = { govBonds, mktm: [], uploadedAt: now, label: now.substring(0,10) };
+        } else {
+          return sendJSON(res,{ok:false,error:'invalid payload'},400);
         }
-        // Validate rows
-        const valid = payload.bonds.filter(b=>
-          b.type && (b.type==='shachar'||b.type==='galil') &&
-          b.maturity && !isNaN(parseFloat(b.yield_pct))
-        );
-        if (!valid.length) return sendJSON(res,{ok:false,error:'no valid rows'},400);
-        userBonds = { bonds: valid, filename: payload.filename||'upload.csv', uploadedAt: payload.uploadedAt||new Date().toISOString() };
-        // Immediately rebuild yields from user data
+
+        userBonds = newBonds;
         const uy = yieldsFromUserBonds();
-        if (uy) { cache.yields = uy; cache.lastUpdate = new Date().toISOString(); }
+        if (uy) { cache.yields = uy; cache.lastUpdate = now; }
         ensureDataDir();
         fs.writeFileSync(USER_BONDS_FILE, JSON.stringify(userBonds,null,2));
-        console.log('[user-bonds] Loaded', valid.length, 'entries from', userBonds.filename);
-        sendJSON(res, { ok:true, count: valid.length, data: userBonds });
+        // Save to history
+        saveBondsHistory({
+          label: newBonds.label,
+          govBondsCount: newBonds.govBonds.length,
+          mktmCount: newBonds.mktm.length,
+          govBonds: newBonds.govBonds,
+          mktm: newBonds.mktm
+        });
+        console.log('[user-bonds] Loaded', newBonds.govBonds.length, 'gov bonds +',
+          newBonds.mktm.length, 'מקמ');
+        sendJSON(res, { ok:true, govBonds: newBonds.govBonds.length,
+          mktm: newBonds.mktm.length, data: userBonds });
       } catch(e) { sendJSON(res,{ok:false,error:e.message},500); }
     });
 
   } else if (pathname==='/api/upload-bonds' && req.method==='DELETE') {
     userBonds = null;
     try { if(fs.existsSync(USER_BONDS_FILE)) fs.unlinkSync(USER_BONDS_FILE); } catch(e){}
-    // Restore ZCM yields
     fetchAllYields().then(y=>{ if(y){cache.yields=y;cache.lastUpdate=new Date().toISOString();} });
     sendJSON(res, { ok:true, message:'user bonds cleared; reverting to BOI ZCM' });
+
+  } else if (pathname==='/api/bonds-history') {
+    sendJSON(res, { history: bondsHistory });
 
   } else if (pathname==='/api/bank-rates') {
     sendJSON(res, { data: cache.bankRates, lastUpdate: cache.lastUpdate });

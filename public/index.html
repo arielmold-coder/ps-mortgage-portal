@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>פורטל יועצי משכנתאות | פסטרנק שהם</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f4f6;color:#222;direction:rtl}
@@ -103,7 +104,6 @@
   
 <button class="tab-btn" onclick="showTab('curves',this)">📈 עקומי ריבית</button>
   <button class="tab-btn" onclick="showTab('makam',this)">⚡ מקמ ומדיניות</button>
-  <button class="tab-btn" onclick="showTab('mortgage',this)">🏦 מחשבון משכנתא</button>
   <button class="tab-btn" onclick="showTab('bankrates',this)">🏛️ ריביות בנקים</button>
   <button class="tab-btn" onclick="showTab('bonds-upload',this)">📤 נתוני אג"ח</button>
   <button class="tab-btn" onclick="showTab('cpi',this)">📉 CPI ואינפלציה</button>
@@ -237,43 +237,6 @@
   </div>
 </div>
 
-<!-- MORTGAGE CALCULATOR -->
-<div id="tab-mortgage" class="tab-pane">
-  <div class="two-col">
-    <div class="card">
-      <h3>מחשבון תשלום חודשי</h3>
-      <div class="input-group"><label>סכום הלוואה (₪)</label><input type="number" id="loan-amt" value="1000000" step="50000" oninput="calcMortgage()"></div>
-      <div class="input-group"><label>תקופה (שנים)</label><input type="number" id="loan-yrs" value="25" min="5" max="30" oninput="calcMortgage()"></div>
-      <div class="input-group"><label>מסלול</label>
-        <select id="loan-track" onchange="setTrack()">
-          <option value="4.73">שקלי קבוע עד 5Y – 4.73%</option>
-          <option value="4.74">שקלי קבוע 5–15Y – 4.74%</option>
-          <option value="5.64">פריים משתנה – 5.64%</option>
-          <option value="5.50">פריים – 5.50%</option>
-          <option value="3.25">צמוד קבוע – 3.25%+מדד</option>
-          <option value="3.45">צמוד משתנה – 3.45%+מדד</option>
-          <option value="">הזנה ידנית</option>
-        </select>
-      </div>
-      <div class="input-group"><label>ריבית שנתית (%)</label><input type="number" id="loan-rate" value="4.73" step="0.01" oninput="calcMortgage()"></div>
-      <div class="calc-result">
-        <div class="sub">תשלום חודשי</div>
-        <div class="big" id="monthly-pmt">₪ 5,626</div>
-        <div class="sub" id="total-pmt">סה"כ: ₪ 1,687,800</div>
-        <div class="sub" id="total-int">ריבית: ₪ 687,800</div>
-      </div>
-    </div>
-    <div class="card">
-      <h3>השוואת מסלולים – מיליון ₪ ל-25 שנה</h3>
-      <div class="ch"><canvas id="ch-compare"></canvas></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3>ניתוח רגישות – תשלום חודשי לפי ריבית (מיליון ₪, 25 שנה)</h3>
-    <div class="ch sm"><canvas id="ch-sensitivity"></canvas></div>
-  </div>
-</div>
-
 <!-- BANK RATES -->
 <div id="tab-bankrates" class="tab-pane">
   <!-- Live bank rates header -->
@@ -312,49 +275,78 @@
   </div>
 </div>
 
-<!-- CPI -->
+<!-- BONDS UPLOAD -->
 <div id="tab-bonds-upload" class="tab-pane">
   <div style="direction:rtl;padding:16px">
-    <h2 style="color:#8bb8d8;margin-bottom:4px">📤 העלאת נתוני אג"ח ממשלתי</h2>
-    <p style="color:#8b9bb8;font-size:13px;margin-bottom:20px">הנתונים שתעלה יחליפו את נתוני BOI ZCM בטבלת התשואות. פורמט: CSV עם עמודות <code style="background:#1e2533;padding:2px 6px;border-radius:4px">type,maturity,yield_pct,date</code></p>
-    
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
-      <div style="flex:1;min-width:280px;background:#1e2533;border-radius:10px;padding:16px">
-        <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:12px">העלה קובץ CSV</h3>
-        <div id="drop-zone" style="border:2px dashed #3d5a80;border-radius:8px;padding:30px;text-align:center;cursor:pointer;transition:border-color .2s"
+    <h2 style="color:#8bb8d8;margin-bottom:4px">📤 נתוני אג"ח ממשלתי ומק"מ</h2>
+    <p style="color:#8b9bb8;font-size:13px;margin-bottom:20px">העלה שני קבצי Excel: אחד לאג"ח ממשלתי ואחד למק"מ. הנתונים ישמשו לעדכון עקומי התשואות.</p>
+
+    <!-- Upload boxes -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+      <!-- Gov bonds -->
+      <div style="background:#1e2533;border-radius:10px;padding:16px">
+        <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:4px">📋 אג"ח ממשלתי</h3>
+        <p style="color:#8b9bb8;font-size:11px;margin-bottom:12px">קובץ Excel עם עמודת "ברוטו להחזקה" ו"סוג הצמדה"</p>
+        <div class="xlsx-drop" id="drop-gov"
           ondragover="event.preventDefault();this.style.borderColor='#5b9bd5'"
           ondragleave="this.style.borderColor='#3d5a80'"
-          ondrop="handleBondDrop(event)">
-          <div style="font-size:32px;margin-bottom:8px">📁</div>
-          <div style="color:#8bb8d8;font-size:13px">גרור CSV לכאן או</div>
-          <label style="display:inline-block;margin-top:10px;padding:8px 16px;background:#3d5a80;color:#fff;border-radius:6px;cursor:pointer;font-size:13px">
+          ondrop="handleXlsxDrop(event,'gov')"
+          style="border:2px dashed #3d5a80;border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s">
+          <div style="font-size:28px;margin-bottom:6px">📊</div>
+          <div style="color:#8bb8d8;font-size:12px">גרור XLSX לכאן או</div>
+          <label style="display:inline-block;margin-top:8px;padding:6px 14px;background:#3d5a80;color:#fff;border-radius:6px;cursor:pointer;font-size:12px">
             בחר קובץ
-            <input type="file" id="bond-file-input" accept=".csv,.txt" style="display:none" onchange="handleBondFile(this.files[0])">
+            <input type="file" id="gov-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleXlsxFile(this.files[0],'gov')">
           </label>
+          <div id="gov-file-name" style="margin-top:8px;font-size:11px;color:#5b9bd5"></div>
         </div>
-        <div id="upload-status" style="margin-top:12px;font-size:13px;color:#8bb8d8;text-align:center"></div>
+        <div id="gov-preview" style="margin-top:10px;font-size:12px;color:#8bb8d8"></div>
       </div>
-      
-      <div style="flex:1;min-width:280px;background:#1e2533;border-radius:10px;padding:16px">
-        <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:12px">תבנית CSV להורדה</h3>
-        <pre style="background:#131929;padding:12px;border-radius:6px;font-size:11px;color:#8bb8d8;overflow-x:auto;direction:ltr">type,maturity,yield_pct,date
-shachar,1Y,3.65,2026-05-21
-shachar,3Y,3.72,2026-05-21
-shachar,5Y,3.78,2026-05-21
-shachar,10Y,4.05,2026-05-21
-shachar,15Y,4.23,2026-05-21
-galil,1Y,2.09,2026-05-21
-galil,3Y,2.05,2026-05-21
-galil,5Y,2.01,2026-05-21
-galil,10Y,2.17,2026-05-21
-galil,15Y,2.26,2026-05-21</pre>
-        <button onclick="downloadTemplate()" style="width:100%;margin-top:10px;padding:8px;background:#2d5016;color:#7dda58;border:1px solid #4a7a24;border-radius:6px;cursor:pointer;font-size:13px">⬇ הורד תבנית CSV</button>
+
+      <!-- Makam -->
+      <div style="background:#1e2533;border-radius:10px;padding:16px">
+        <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:4px">⚡ מק"מ</h3>
+        <p style="color:#8b9bb8;font-size:11px;margin-bottom:12px">קובץ Excel מק"מ עם עמודות ימים לפדיון ותשואה</p>
+        <div class="xlsx-drop" id="drop-mktm"
+          ondragover="event.preventDefault();this.style.borderColor='#5b9bd5'"
+          ondragleave="this.style.borderColor='#3d5a80'"
+          ondrop="handleXlsxDrop(event,'mktm')"
+          style="border:2px dashed #3d5a80;border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s">
+          <div style="font-size:28px;margin-bottom:6px">⚡</div>
+          <div style="color:#8bb8d8;font-size:12px">גרור XLSX לכאן או</div>
+          <label style="display:inline-block;margin-top:8px;padding:6px 14px;background:#3d5a80;color:#fff;border-radius:6px;cursor:pointer;font-size:12px">
+            בחר קובץ
+            <input type="file" id="mktm-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleXlsxFile(this.files[0],'mktm')">
+          </label>
+          <div id="mktm-file-name" style="margin-top:8px;font-size:11px;color:#5b9bd5"></div>
+        </div>
+        <div id="mktm-preview" style="margin-top:10px;font-size:12px;color:#8bb8d8"></div>
       </div>
     </div>
 
-    <div style="background:#1e2533;border-radius:10px;padding:16px">
-      <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:12px">נתונים טעונים כעת</h3>
+    <!-- Upload button + status -->
+    <div style="text-align:center;margin-bottom:20px">
+      <button id="btn-upload-bonds" onclick="uploadParsedBonds()"
+        style="padding:10px 32px;background:#3d5a80;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">
+        ⬆ העלה נתונים לשרת
+      </button>
+      <div id="upload-status" style="margin-top:10px;font-size:13px;color:#8bb8d8"></div>
+    </div>
+
+    <!-- Current data + history -->
+    <div style="background:#1e2533;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="color:#e4e8f0;font-size:14px;margin:0">נתונים טעונים כעת</h3>
+        <button onclick="clearBonds()" style="padding:4px 12px;background:#4a1515;color:#e74c3c;border:1px solid #7a2020;border-radius:6px;cursor:pointer;font-size:11px">🗑 נקה</button>
+      </div>
       <div id="current-bonds-display" style="color:#8bb8d8;font-size:13px">טוען...</div>
+    </div>
+
+    <!-- History -->
+    <div style="background:#1e2533;border-radius:10px;padding:16px">
+      <h3 style="color:#e4e8f0;font-size:14px;margin-bottom:10px">📅 היסטוריית העלאות</h3>
+      <div id="bonds-history-display" style="color:#8bb8d8;font-size:12px">טוען...</div>
     </div>
   </div>
 </div>
@@ -586,7 +578,6 @@ function initTab(name) {
   if (name==='dashboard') initDash();
   else if (name==='curves') initCurves();
   else if (name==='makam') initMakam();
-  else if (name==='mortgage') initMortgage();
   else if (name==='bankrates') initBank();
   else if (name==='cpi') initCPI();
   else if (name==='housing') initHousing();
@@ -667,27 +658,7 @@ function initMakam() {
   });
 }
 
-// ====================================================
-// MORTGAGE
-// ====================================================
-function initMortgage() {
-  const tracks=['שקלי קבוע עד 5Y','שקלי קבוע 5–15Y','פריים','צמוד קבוע','צמוד משתנה'];
-  const pmts=[5626,5632,6198,4870,4985];
-  mkChart('ch-compare',{type:'bar',data:{
-    labels:tracks,
-    datasets:[{label:'תשלום חודשי (₪)',data:pmts,backgroundColor:['rgba(107,26,40,.85)','rgba(107,26,40,.65)','rgba(184,151,77,.85)','rgba(39,174,96,.85)','rgba(39,174,96,.65)'],borderRadius:5}]},
-    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9},maxRotation:20},grid:{display:false}},y:{ticks:{callback:v=>'₪'+v.toLocaleString('he-IL'),font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
-  });
 
-  const rates=[3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0];
-  const pmtFn=r=>{const mo=r/100/12,n=25*12,p=1e6;return +(p*mo*Math.pow(1+mo,n)/(Math.pow(1+mo,n)-1)).toFixed(0);};
-  mkChart('ch-sensitivity',{type:'line',data:{
-    labels:rates.map(r=>r+'%'),
-    datasets:[{label:'תשלום חודשי (₪)',data:rates.map(pmtFn),borderColor:M,backgroundColor:'rgba(107,26,40,.07)',fill:true,borderWidth:2.5,pointRadius:5,tension:.4}]},
-    options:baseOpts({plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'ריבית שנתית'}},y:{ticks:{callback:v=>'₪'+Number(v).toLocaleString('he-IL'),font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})
-  });
-  calcMortgage();
-}
 
 // ====================================================
 // BANK RATES — live from /api/bank-rates
@@ -972,24 +943,7 @@ function initBonds() {
   ]},options:baseOpts({scales:{x:{title:{display:true,text:'מח"מ שנים'},ticks:{font:{size:9}}},y:{title:{display:true,text:'תשואה %'},ticks:{callback:v=>v.toFixed(2)+'%',font:{size:9}},grid:{color:'rgba(0,0,0,.06)'}}}})});
 }
 
-// ====================================================
-// MORTGAGE CALCULATOR
-// ====================================================
-function setTrack() {
-  const v = document.getElementById('loan-track').value;
-  if (v) document.getElementById('loan-rate').value = v;
-  calcMortgage();
-}
-function calcMortgage() {
-  const P=+(document.getElementById('loan-amt').value)||1e6;
-  const n=(+(document.getElementById('loan-yrs').value)||25)*12;
-  const r=(+(document.getElementById('loan-rate').value)||4.73)/100/12;
-  const pmt = r>0 ? P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1) : P/n;
-  const fmt=v=>'₪ '+Math.round(v).toLocaleString('he-IL');
-  document.getElementById('monthly-pmt').textContent=fmt(pmt);
-  document.getElementById('total-pmt').textContent='סה"כ: '+fmt(pmt*n);
-  document.getElementById('total-int').textContent='ריבית: '+fmt(pmt*n-P);
-}
+
 
 // ====================================================
 // LIVE BOI REFRESH
@@ -1017,7 +971,6 @@ async function refreshBOI() {
 // INIT
 // ====================================================
 window.addEventListener('DOMContentLoaded',()=>{
-  calcMortgage();
   setTimeout(()=>initTab('dashboard'),120);
 });
 </script>
@@ -1091,79 +1044,218 @@ async function loadLiveData(){
   }catch(e){console.warn('loadLiveData:',e);}
 }
 
-// ── Bond upload ──────────────────────────────────────────
-function downloadTemplate(){
-  const csv='type,maturity,yield_pct,date\nshachar,1Y,3.65,2026-05-21\nshachar,3Y,3.72,2026-05-21\nshachar,5Y,3.78,2026-05-21\nshachar,10Y,4.05,2026-05-21\nshachar,15Y,4.23,2026-05-21\ngalil,1Y,2.09,2026-05-21\ngalil,3Y,2.05,2026-05-21\ngalil,5Y,2.01,2026-05-21\ngalil,10Y,2.17,2026-05-21\ngalil,15Y,2.26,2026-05-21';
-  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='bond-template.csv';a.click();
+// ── XLSX Bond Upload ─────────────────────────────────────
+let _parsedGov = null;
+let _parsedMktm = null;
+
+function handleXlsxDrop(e, kind) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '#3d5a80';
+  const f = e.dataTransfer.files[0];
+  if (f) handleXlsxFile(f, kind);
 }
-function handleBondDrop(e){
-  e.preventDefault();e.currentTarget.style.borderColor='#3d5a80';
-  const f=e.dataTransfer.files[0];if(f)handleBondFile(f);
+
+function handleXlsxFile(file, kind) {
+  if (!file) return;
+  const nameEl = document.getElementById(kind + '-file-name');
+  const previewEl = document.getElementById(kind + '-preview');
+  if (nameEl) nameEl.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      if (kind === 'gov') {
+        _parsedGov = parseGovBondsSheet(wb);
+        previewEl.innerHTML = renderBondPreview(_parsedGov, 'gov');
+      } else {
+        _parsedMktm = parseMktmSheet(wb);
+        previewEl.innerHTML = renderBondPreview(_parsedMktm, 'mktm');
+      }
+    } catch(err) {
+      if (previewEl) previewEl.innerHTML = '<span style="color:#e74c3c">❌ שגיאה בקריאת הקובץ: ' + err.message + '</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
-async function handleBondFile(file){
-  if(!file)return;
-  const status=document.getElementById('upload-status');
-  status.textContent='קורא קובץ...';status.style.color='#8bb8d8';
-  try{
-    const text=await file.text();
-    const rows=parseBondCSV(text);
-    if(!rows.length){status.textContent='❌ לא נמצאו שורות תקינות ב-CSV';status.style.color='#e74c3c';return;}
-    status.textContent='שולח '+rows.length+' שורות...';
-    const r=await fetch('/api/upload-bonds',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bonds:rows,filename:file.name,uploadedAt:new Date().toISOString()})});
-    const d=await r.json();
-    if(d.ok){
-      status.textContent='✅ הועלה בהצלחה — '+rows.length+' ערכים';status.style.color='#27ae60';
-      showCurrentBonds(d.data);
-    }else{status.textContent='❌ שגיאה: '+(d.error||'unknown');status.style.color='#e74c3c';}
-  }catch(e){status.textContent='❌ '+e.message;status.style.color='#e74c3c';}
+
+function parseGovBondsSheet(wb) {
+  // Find the gov bonds sheet — try 'אג"ח' or first sheet
+  const sheetName = wb.SheetNames.find(n => n.includes('אג') || n.includes('gov')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  const result = [];
+  // Row 0 = headers, data from row 1
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const name    = r[0];
+    const id      = r[1];
+    const duration= parseFloat(r[6]);
+    const yieldPct= parseFloat(r[7]);
+    const spread  = parseFloat(r[8]);
+    const indexing= (r[24] || '').toString().trim();
+    const maturity = r[28];
+    if (isNaN(yieldPct)) continue;
+    result.push({ name, id, duration, yield_pct: yieldPct, spread, indexing, maturity });
+  }
+  return result;
 }
-function parseBondCSV(text){
-  const lines=text.trim().split('\n').filter(l=>l.trim());
-  if(!lines.length)return[];
-  const h=lines[0].toLowerCase().split(',').map(s=>s.trim());
-  const ti=h.indexOf('type'),mi=h.indexOf('maturity'),yi=h.findIndex(c=>c.includes('yield')),di=h.findIndex(c=>c.includes('date'));
-  if(ti<0||mi<0||yi<0)return[];
-  return lines.slice(1).map(l=>{
-    const c=l.split(',').map(s=>s.trim());
-    return{type:(c[ti]||'').toLowerCase(),maturity:c[mi]||'',yield_pct:parseFloat(c[yi]),date:di>=0?c[di]:new Date().toISOString().split('T')[0]};
-  }).filter(r=>r.type&&r.maturity&&!isNaN(r.yield_pct));
+
+function parseMktmSheet(wb) {
+  // Find the mktm sheet — try 'מק"מ' or second sheet
+  const sheetName = wb.SheetNames.find(n => n.includes('מק') || n.includes('mkt')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  const result = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const name    = r[0];
+    const price   = parseFloat(r[1]);
+    const days    = parseFloat(r[2]);
+    const yieldPct= parseFloat(r[3]);
+    const maturity= r[12];
+    const id      = r[14];
+    if (isNaN(yieldPct)) continue;
+    result.push({ name, price, days, yield_pct: yieldPct, maturity, id });
+  }
+  return result;
 }
-function showCurrentBonds(data){
-  const el=document.getElementById('current-bonds-display');
-  if(!el)return;
-  if(!data||!data.bonds||!data.bonds.length){el.innerHTML='<span style="color:#666">אין נתוני אג"ח מועלים — מוצגים נתוני BOI ZCM</span>';return;}
-  const date=data.uploadedAt?new Date(data.uploadedAt).toLocaleString('he-IL'):'—';
-  const byType={};
-  data.bonds.forEach(b=>{
-    if(!byType[b.type])byType[b.type]=[];
-    byType[b.type].push(b);
-  });
-  let html='<div style="font-size:11px;color:#666;margin-bottom:10px">📅 הועלה: '+date+' | '+data.filename+'</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead>'
-    +'<tr style="color:#8bb8d8;border-bottom:1px solid #2d3748"><th style="padding:4px 8px;text-align:right">סוג</th><th style="padding:4px 8px;text-align:right">מח"מ</th><th style="padding:4px 8px;text-align:right">תשואה</th><th style="padding:4px 8px;text-align:right">תאריך</th></tr></thead><tbody>';
-  data.bonds.forEach(b=>{
-    html+='<tr style="border-bottom:1px solid #1e2533"><td style="padding:4px 8px">'+(b.type==='shachar'?'שחר':'גליל')
-      +'</td><td style="padding:4px 8px">'+b.maturity+'</td><td style="padding:4px 8px;color:#e4e8f0;font-weight:600">'+b.yield_pct.toFixed(3)+'%</td><td style="padding:4px 8px;color:#666">'+b.date+'</td></tr>';
-  });
-  html+='</tbody></table><div style="margin-top:12px"><button onclick="clearBonds()" style="padding:6px 14px;background:#4a1515;color:#e74c3c;border:1px solid #7a2020;border-radius:6px;cursor:pointer;font-size:12px">🗑 מחק נתונים ועבור ל-BOI ZCM</button></div>';
-  el.innerHTML=html;
+
+function renderBondPreview(rows, kind) {
+  if (!rows || !rows.length) return '<span style="color:#8b9bb8">לא נמצאו שורות</span>';
+  if (kind === 'gov') {
+    const shachar = rows.filter(r => r.indexing === 'שקלי' || r.indexing === 'משתנה');
+    const galil   = rows.filter(r => r.indexing === 'מדד' || r.indexing.includes('צמוד'));
+    return `<span style="color:#7dda58">✅ ${rows.length} אג"ח</span> — שקלי: <b>${shachar.length}</b> | צמוד: <b>${galil.length}</b>`;
+  } else {
+    return `<span style="color:#7dda58">✅ ${rows.length} מק"מ</span>`;
+  }
 }
-async function clearBonds(){
-  const r=await fetch('/api/upload-bonds',{method:'DELETE'});
-  const d=await r.json();
-  if(d.ok){document.getElementById('current-bonds-display').innerHTML='<span style="color:#666">נתוני אג"ח נמחקו — מוצגים נתוני BOI ZCM</span>';document.getElementById('upload-status').textContent='';}
+
+async function uploadParsedBonds() {
+  const status = document.getElementById('upload-status');
+  if (!_parsedGov && !_parsedMktm) {
+    status.textContent = '❌ אנא בחר לפחות קובץ אחד';
+    status.style.color = '#e74c3c';
+    return;
+  }
+  status.textContent = 'שולח...';
+  status.style.color = '#8bb8d8';
+  const payload = {
+    govBonds:  _parsedGov  || [],
+    mktm:      _parsedMktm || [],
+    uploadedAt: new Date().toISOString(),
+    label: new Date().toLocaleDateString('he-IL')
+  };
+  try {
+    const r = await fetch('/api/upload-bonds', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      const total = (_parsedGov||[]).length + (_parsedMktm||[]).length;
+      status.textContent = '✅ הועלה בהצלחה — ' + total + ' ניירות ערך';
+      status.style.color = '#27ae60';
+      loadCurrentBonds();
+      loadBondsHistory();
+    } else {
+      status.textContent = '❌ שגיאה: ' + (d.error || 'unknown');
+      status.style.color = '#e74c3c';
+    }
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
+    status.style.color = '#e74c3c';
+  }
 }
-async function loadCurrentBonds(){
-  try{
-    const r=await fetch('/api/user-bonds');const d=await r.json();
+
+function showCurrentBonds(data) {
+  const el = document.getElementById('current-bonds-display');
+  if (!el) return;
+  if (!data) { el.innerHTML = '<span style="color:#666">אין נתוני אג"ח מועלים — מוצגים נתוני BOI ZCM</span>'; return; }
+  const gov = data.govBonds || [];
+  const mktm = data.mktm || [];
+  if (!gov.length && !mktm.length) { el.innerHTML = '<span style="color:#666">אין נתוני אג"ח מועלים — מוצגים נתוני BOI ZCM</span>'; return; }
+  const date = data.uploadedAt ? new Date(data.uploadedAt).toLocaleString('he-IL') : '—';
+  const shachar = gov.filter(b => b.indexing === 'שקלי' || b.indexing === 'משתנה');
+  const galil   = gov.filter(b => b.indexing !== 'שקלי' && b.indexing !== 'משתנה');
+  let html = `<div style="font-size:11px;color:#666;margin-bottom:12px">📅 הועלה: ${date}</div>`;
+  if (gov.length) {
+    html += '<div style="margin-bottom:12px"><div style="color:#8bb8d8;font-size:12px;font-weight:600;margin-bottom:6px">אג"ח ממשלתי (' + gov.length + ')</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    // Shachar table
+    if (shachar.length) {
+      html += '<div><div style="color:#5b9bd5;font-size:11px;margin-bottom:4px">שקלי / שחר (' + shachar.length + ')</div>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#8b9bb8"><th style="text-align:right;padding:2px 4px">שם</th><th style="text-align:right;padding:2px 4px">מח"מ</th><th style="text-align:right;padding:2px 4px">תשואה</th></tr>';
+      shachar.slice(0,10).forEach(b => { html += `<tr style="border-bottom:1px solid #2d3748"><td style="padding:2px 4px">${b.name||''}</td><td style="padding:2px 4px">${isNaN(b.duration)?'—':b.duration.toFixed(2)}</td><td style="padding:2px 4px;color:#e4e8f0;font-weight:600">${isNaN(b.yield_pct)?'—':b.yield_pct.toFixed(3)}%</td></tr>`; });
+      if (shachar.length > 10) html += `<tr><td colspan="3" style="color:#666;padding:2px 4px">... ועוד ${shachar.length-10}</td></tr>`;
+      html += '</table></div>';
+    }
+    // Galil table
+    if (galil.length) {
+      html += '<div><div style="color:#f0a500;font-size:11px;margin-bottom:4px">צמוד מדד / גליל (' + galil.length + ')</div>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#8b9bb8"><th style="text-align:right;padding:2px 4px">שם</th><th style="text-align:right;padding:2px 4px">מח"מ</th><th style="text-align:right;padding:2px 4px">תשואה</th></tr>';
+      galil.slice(0,10).forEach(b => { html += `<tr style="border-bottom:1px solid #2d3748"><td style="padding:2px 4px">${b.name||''}</td><td style="padding:2px 4px">${isNaN(b.duration)?'—':b.duration.toFixed(2)}</td><td style="padding:2px 4px;color:#e4e8f0;font-weight:600">${isNaN(b.yield_pct)?'—':b.yield_pct.toFixed(3)}%</td></tr>`; });
+      if (galil.length > 10) html += `<tr><td colspan="3" style="color:#666;padding:2px 4px">... ועוד ${galil.length-10}</td></tr>`;
+      html += '</table></div>';
+    }
+    html += '</div></div>';
+  }
+  if (mktm.length) {
+    html += '<div><div style="color:#8bb8d8;font-size:12px;font-weight:600;margin-bottom:6px">מק"מ (' + mktm.length + ')</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#8b9bb8"><th style="text-align:right;padding:2px 4px">שם</th><th style="text-align:right;padding:2px 4px">ימים</th><th style="text-align:right;padding:2px 4px">תשואה</th></tr>';
+    mktm.slice(0,8).forEach(b => { html += `<tr style="border-bottom:1px solid #2d3748"><td style="padding:2px 4px">${b.name||''}</td><td style="padding:2px 4px">${isNaN(b.days)?'—':Math.round(b.days)}</td><td style="padding:2px 4px;color:#e4e8f0;font-weight:600">${isNaN(b.yield_pct)?'—':b.yield_pct.toFixed(3)}%</td></tr>`; });
+    if (mktm.length > 8) html += `<tr><td colspan="3" style="color:#666;padding:2px 4px">... ועוד ${mktm.length-8}</td></tr>`;
+    html += '</table></div>';
+  }
+  el.innerHTML = html;
+}
+
+async function clearBonds() {
+  const r = await fetch('/api/upload-bonds', {method:'DELETE'});
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById('current-bonds-display').innerHTML = '<span style="color:#666">נתוני אג"ח נמחקו — מוצגים נתוני BOI ZCM</span>';
+    document.getElementById('upload-status').textContent = '';
+    _parsedGov = null; _parsedMktm = null;
+    loadBondsHistory();
+  }
+}
+
+async function loadCurrentBonds() {
+  try {
+    const r = await fetch('/api/user-bonds');
+    const d = await r.json();
     showCurrentBonds(d.data);
-  }catch(e){}
+  } catch(e) {}
+}
+
+async function loadBondsHistory() {
+  const el = document.getElementById('bonds-history-display');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/bonds-history');
+    const d = await r.json();
+    const hist = d.history || [];
+    if (!hist.length) { el.innerHTML = '<span style="color:#666">אין היסטוריה</span>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#8b9bb8"><th style="text-align:right;padding:3px 8px">תאריך</th><th style="text-align:right;padding:3px 8px">אג"ח</th><th style="text-align:right;padding:3px 8px">מק"מ</th><th style="text-align:right;padding:3px 8px">תווית</th></tr>';
+    hist.slice().reverse().forEach(h => {
+      const dt = h.uploadedAt ? new Date(h.uploadedAt).toLocaleString('he-IL') : '—';
+      const govCnt = (h.govBonds||[]).length || (h.bonds||[]).length || 0;
+      const mktmCnt = (h.mktm||[]).length || 0;
+      html += `<tr style="border-bottom:1px solid #2d3748"><td style="padding:3px 8px;color:#666">${dt}</td><td style="padding:3px 8px">${govCnt}</td><td style="padding:3px 8px">${mktmCnt}</td><td style="padding:3px 8px;color:#5b9bd5">${h.label||'—'}</td></tr>`;
+    });
+    html += '</table>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<span style="color:#e74c3c">שגיאה בטעינת היסטוריה</span>'; }
 }
 
 // Scripts at bottom of <body> — DOM is already parsed; call directly
 setTimeout(loadLiveData, 500);      // 500ms: after tab init + chart render
 setTimeout(loadCurrentBonds, 700);
+setTimeout(loadBondsHistory, 900);
 // Also re-run after full page load in case charts overwrite values
 window.addEventListener('load', ()=>{ setTimeout(loadLiveData, 800); });
 </script>
