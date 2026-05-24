@@ -86,7 +86,7 @@
       <div class="lbl">פריים: <span id="prime-val">5.50%</span></div>
     </div>
     <button class="refresh-btn" onclick="refreshBOI()">🔄 רענן ריבית BOI</button>
-    <div id="refresh-status">נתוני ניירות: 19.05.2026</div>
+    <div id="refresh-status">נתוני ניירות: –</div>
   </div>
 </header>
 
@@ -159,7 +159,7 @@
 <!-- CURVES -->
 <div id="tab-curves" class="tab-pane">
   <div class="card">
-    <h3>עקומי תשואה NSS – שקלי (שחר+מקמ), צמוד (גליל), Breakeven | נתוני יום 19.05.2026</h3>
+    <h3 id="nss-curves-title">עקומי תשואה NSS – שקלי (שחר+מקמ), צמוד (גליל), Breakeven | נתוני יום –</h3>
     <div class="ch tall"><canvas id="ch-all-curves"></canvas></div>
   </div>
   <div class="two-col">
@@ -201,7 +201,7 @@
 <div id="tab-makam" class="tab-pane">
   <div class="two-col">
     <div class="card">
-      <h3>עקום מקמ – תשואות (12 ניירות, נתוני קובץ 19.05.2026)</h3>
+      <h3 id="makam-chart-title">עקום מקמ – תשואות | נתוני קובץ –</h3>
       <div class="ch"><canvas id="ch-makam"></canvas></div>
     </div>
     <div class="card">
@@ -469,7 +469,7 @@
 
 <script>
 // ====================================================
-// DATA from Excel files + NSS analysis (19.05.2026)
+// DATA from Excel files + NSS analysis
 // ====================================================
 const D = {
   nom: {0.25:3.738,0.5:3.664,0.75:3.651,1:3.668,1.5:3.693,2:3.710,3:3.720,4:3.751,5:3.792,6:3.857,7:3.924,8:3.994,9:4.066,10:4.135,12:4.263,15:4.398,20:4.560,25:4.675,30:4.731},
@@ -1182,6 +1182,14 @@ function showCurrentBonds(data) {
   const shachar = gov.filter(b => b.indexing === 'שקלי' || b.indexing === 'משתנה');
   const galil   = gov.filter(b => b.indexing !== 'שקלי' && b.indexing !== 'משתנה');
   let html = `<div style="font-size:11px;color:#666;margin-bottom:12px">📅 הועלה: ${date}</div>`;
+  // Update titles in other tabs with the upload date
+  const shortDate = data.uploadedAt ? new Date(data.uploadedAt).toLocaleDateString('he-IL') : '–';
+  const nssTitleEl = document.getElementById('nss-curves-title');
+  const makamTitleEl = document.getElementById('makam-chart-title');
+  const refreshEl = document.getElementById('refresh-status');
+  if (nssTitleEl) nssTitleEl.textContent = 'עקומי תשואה NSS – שקלי (שחר+מקמ), צמוד (גליל), Breakeven | נתוני יום ' + shortDate;
+  if (makamTitleEl) makamTitleEl.textContent = 'עקום מקמ – תשואות | נתוני קובץ ' + shortDate;
+  if (refreshEl && !refreshEl.textContent.includes('מרענן')) refreshEl.textContent = 'נתוני ניירות: ' + shortDate;
   if (gov.length) {
     html += '<div style="margin-bottom:12px"><div style="color:#8bb8d8;font-size:12px;font-weight:600;margin-bottom:6px">אג"ח ממשלתי (' + gov.length + ')</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
